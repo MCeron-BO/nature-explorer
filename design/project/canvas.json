@@ -1,0 +1,23 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-10-24T15:30:00Z"},
+  "title": "Nature Explorer",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 390, "h": 844, "title": "1 · Inicio", "is_interactive": true, "radius": 40},
+    "Mapa.dc.html": {"x": 470, "y": 0, "w": 390, "h": 844, "title": "2 · Mapa principal", "is_interactive": true, "radius": 40},
+    "Captura.dc.html": {"x": 940, "y": 0, "w": 390, "h": 844, "title": "3 · Capturar y validar", "is_interactive": true, "radius": 40},
+    "NuevoRegistro.dc.html": {"x": 1410, "y": 0, "w": 390, "h": 844, "title": "4 · Nuevo registro", "is_interactive": true, "radius": 40},
+    "Especies.dc.html": {"x": 0, "y": 1244, "w": 390, "h": 844, "title": "5 · Especies del entorno", "is_interactive": true, "radius": 40},
+    "Ficha.dc.html": {"x": 470, "y": 1244, "w": 390, "h": 1180, "title": "6 · Ficha de especie", "is_interactive": true, "radius": 40},
+    "Observaciones.dc.html": {"x": 940, "y": 1244, "w": 390, "h": 844, "title": "7 · Mis observaciones y colección", "is_interactive": true, "radius": 40}
+  },
+  "order": ["Main.dc.html", "Mapa.dc.html", "Captura.dc.html", "NuevoRegistro.dc.html", "Especies.dc.html", "Ficha.dc.html", "Observaciones.dc.html"],
+  "notes": {
+    "flow": {"x": 0, "y": -300, "text": "Explorar → Encontrar → Capturar → Validar → Coleccionar", "kind": "title1", "maxW": 1800},
+    "lists": {"x": 0, "y": 944, "text": "Listado, ficha y colección", "kind": "title1", "maxW": 1330},
+    "howto": {"x": 1410, "y": 1244, "w": 380, "fill": "green", "size": "m", "text": "Cómo recorrer el prototipo\n\n• Pulsa Play en cualquier pantalla: los botones y la barra inferior navegan entre ellas.\n• Mapa: cambia el radio (1–50 km) y despliega el panel inferior.\n• Capturar y validar: un solo flujo con estado (carta → ¡Capturada! → validar → cámara → IA → resultado). En Tweaks eliges el resultado: validada, posible nuevo registro local o posible ampliación de distribución.\n• Especies: buscador, filtros y menú de descarga funcionan.\n\nLos conteos y distancias son datos de ejemplo; en producción vienen de las APIs de GBIF (occurrence/search) e iNaturalist (observations/species_counts). Las fotos son marcadores de posición para imágenes CC de iNaturalist."}
+  },
+  "designSystems": []
+}

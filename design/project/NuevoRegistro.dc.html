@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Nature Explorer · Nuevo registro</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=Source+Serif+4:ital,opsz,wght@1,8..60,400;1,8..60,600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1E4D34;text-decoration:none}a:hover{color:#14231A}
+button,input,textarea{font-family:inherit}
+button{cursor:pointer}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #FFFFFF; font-family: 'IBM Plex Sans', system-ui, sans-serif; color: #14231A; display: flex; flex-direction: column">
+
+  <header style="display: flex; flex-direction: column; gap: 12px; padding: 16px 20px 12px; border-bottom: 1px solid #E3E9E5">
+    <div style="display: flex; align-items: center; gap: 8px">
+      <a href="Mapa.dc.html" aria-label="Volver al mapa" style="width: 44px; height: 44px; margin-left: -10px; display: flex; align-items: center; justify-content: center; color: #14231A"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5 8 12l7 7"></path></svg></a>
+      <div style="display: flex; flex-direction: column">
+        <span style="font-size: 19px; font-weight: 700">Nuevo registro</span>
+        <span style="font-size: 13px; color: #4B5A51">Ciencia ciudadana · especie descubierta por ti</span>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px">
+      <sc-for list="{{stepper}}" as="s" hint-placeholder-count="4">
+        <div style="display: flex; flex-direction: column; gap: 5px">
+          <span style="height: 4px; border-radius: 4px; background: {{s.bar}}"></span>
+          <span style="font-size: 12px; font-weight: {{s.weight}}; color: {{s.color}}">{{s.label}}</span>
+        </div>
+      </sc-for>
+    </div>
+  </header>
+
+  <sc-if value="{{is.s1}}" hint-placeholder-val="{{true}}">
+    <div style="flex: 1; display: flex; flex-direction: column; padding: 16px 20px 20px; gap: 14px">
+      <div style="height: 440px; border-radius: 20px; background: #1E2A21; position: relative; overflow: hidden">
+        <svg width="350" height="440" viewBox="0 0 350 440" fill="none" stroke="#4A6A52" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="position: absolute; inset: 0"><path d="M175 440V200"></path><path d="M175 200c-10-30-40-40-60-36 6 24 30 38 60 36z"></path><path d="M175 200c10-30 40-40 60-36-6 24-30 38-60 36z"></path><path d="M175 200c-6-26 0-50 0-60 0 10 6 34 0 60z"></path><path d="M175 300c-30-4-50 6-60 22 26 6 46-2 60-22z"></path><path d="M175 280c26-10 48-4 60 10-24 10-44 6-60-10z"></path></svg>
+        <div style="position: absolute; left: 50px; top: 90px; width: 250px; height: 250px; border: 2px dashed rgba(255,255,255,0.7); border-radius: 18px"></div>
+        <div style="position: absolute; left: 16px; right: 16px; bottom: 16px; background: rgba(14,20,16,0.78); color: #FFFFFF; border-radius: 14px; padding: 10px 12px; font-size: 14px; line-height: 1.45; text-align: center">Fotografía una planta que no aparece en el mapa. Incluye flor, hoja o fruto si es posible.</div>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: center; gap: 44px; margin-top: auto">
+        <button aria-label="Elegir de la galería" style="width: 48px; height: 48px; border-radius: 12px; border: 1px solid #D5E3DA; background: #FFFFFF; color: #14231A; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m3 16 5-5 4 4 3-3 6 6"></path></svg></button>
+        <button onClick="{{go.s2}}" aria-label="Tomar fotografía" style="width: 78px; height: 78px; border-radius: 999px; border: 4px solid #1E4D34; background: #FFFFFF; padding: 5px"><span style="display: block; width: 100%; height: 100%; border-radius: 999px; background: #1E4D34"></span></button>
+        <span style="width: 48px"></span>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{is.s2}}" hint-placeholder-val="{{false}}">
+    <div style="flex: 1; display: flex; flex-direction: column; padding: 16px 20px 20px; gap: 14px">
+      <div style="height: 180px; border-radius: 18px; background: #2A3A2E; color: #8FB59A; display: flex; align-items: center; justify-content: center; position: relative">
+        <svg width="90" height="120" viewBox="0 0 120 160" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M60 160V60"></path><path d="M60 60c-10-30-40-40-60-36 6 24 30 38 60 36z"></path><path d="M60 60c10-30 40-40 60-36-6 24-30 38-60 36z"></path><path d="M60 110c-30-4-46 6-54 20 24 6 42-2 54-20z"></path></svg>
+        <span style="position: absolute; top: 10px; left: 10px; font-size: 12px; font-weight: 600; color: #FFFFFF; background: rgba(0,0,0,0.5); padding: 3px 8px; border-radius: 999px">Foto 1 de 1</span>
+      </div>
+      <div style="border: 1px solid #E3E9E5; border-radius: 18px; overflow: hidden">
+        <div style="height: 130px; background: #3E5134; position: relative">
+          <svg width="350" height="130" viewBox="0 0 350 130" aria-hidden="true"><rect width="350" height="130" fill="#46583A"></rect><path d="M0 80c80-20 140 10 200-10s110-40 150-30v90H0z" fill="#56653F"></path><path d="M0 40c90 20 170 10 350 60" stroke="#CFC7A8" stroke-opacity="0.7" stroke-width="3" fill="none"></path><circle cx="175" cy="66" r="22" fill="#2F80ED" fill-opacity="0.22"></circle><circle cx="175" cy="66" r="8" fill="#2F80ED" stroke="#FFFFFF" stroke-width="3"></circle></svg>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; font-size: 14px">
+          <div style="display: flex; align-items: center; gap: 8px; font-weight: 700; color: #1E4D34"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"></path></svg>Ubicación capturada</div>
+          <div style="display: flex; justify-content: space-between"><span style="color: #4B5A51">Coordenadas</span><span style="font-weight: 600">33,0458° S · 71,6197° O</span></div>
+          <div style="display: flex; justify-content: space-between"><span style="color: #4B5A51">Precisión</span><span style="font-weight: 600">±4 m</span></div>
+          <div style="display: flex; justify-content: space-between"><span style="color: #4B5A51">Altitud</span><span style="font-weight: 600">142 m s.n.m.</span></div>
+          <div style="display: flex; justify-content: space-between"><span style="color: #4B5A51">Fecha y hora</span><span style="font-weight: 600">24 oct 2026 · 16:42</span></div>
+        </div>
+      </div>
+      <button onClick="{{go.s3}}" style="margin-top: auto; height: 56px; border-radius: 18px; border: none; background: #1E4D34; color: #FFFFFF; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"></path></svg>Identificar con IA
+      </button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{is.s3}}" hint-placeholder-val="{{false}}">
+    <div style="flex: 1; display: flex; flex-direction: column; padding: 16px 20px 20px; gap: 12px">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <span style="font-size: 17px; font-weight: 700">Sugerencias de la IA</span>
+        <span style="font-size: 13px; color: #4B5A51">Basadas en la foto, la ubicación y la época del año</span>
+      </div>
+      <sc-for list="{{options}}" as="o" hint-placeholder-count="3">
+        <button onClick="{{o.pick}}" aria-pressed="{{o.pressed}}" style="display: flex; align-items: center; gap: 12px; text-align: left; border-radius: 16px; padding: 10px 12px; background: #FFFFFF; border: {{o.border}}; color: #14231A">
+          <span style="width: 22px; height: 22px; border-radius: 999px; border: 2px solid #1E4D34; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><span style="width: 12px; height: 12px; border-radius: 999px; background: {{o.dot}}"></span></span>
+          <span style="flex: 1; display: flex; flex-direction: column"><span style="font-family: 'Source Serif 4', Georgia, serif; font-style: italic; font-size: 16px">{{o.sci}}</span><span style="font-size: 13px; color: #4B5A51">{{o.common}}</span></span>
+          <span style="font-size: 17px; font-weight: 700; color: #1E4D34">{{o.pct}} %</span>
+        </button>
+      </sc-for>
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 4px; padding-top: 12px; border-top: 1px solid #E3E9E5">
+        <label for="cat" style="font-size: 14px; font-weight: 600">¿No es ninguna? Buscar en catálogo oficial</label>
+        <div style="display: flex; align-items: center; gap: 8px; height: 46px; border-radius: 14px; border: 1px solid #D5E3DA; padding: 0 12px; color: #4B5A51">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m20 20-4.2-4.2"></path></svg>
+          <input id="cat" type="search" placeholder="Nombre común o científico" style="flex: 1; border: none; outline: none; font-size: 15px; color: #14231A; background: transparent">
+        </div>
+        <span style="font-size: 12px; color: #4B5A51">Catálogo taxonómico GBIF Backbone · Flora de Chile</span>
+      </div>
+      <button onClick="{{go.s4}}" style="margin-top: auto; height: 56px; border-radius: 18px; border: none; background: #1E4D34; color: #FFFFFF; font-size: 16px; font-weight: 700">Usar esta identificación</button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{is.s4}}" hint-placeholder-val="{{false}}">
+    <div style="flex: 1; display: flex; flex-direction: column; padding: 16px 20px 20px; gap: 14px">
+      <div style="display: flex; gap: 12px; align-items: center; border: 1px solid #E3E9E5; border-radius: 18px; padding: 12px">
+        <div style="width: 64px; height: 64px; border-radius: 14px; background: #2A3A2E; color: #8FB59A; display: flex; align-items: center; justify-content: center"><svg width="30" height="40" viewBox="0 0 120 160" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M60 160V60"></path><path d="M60 60c-10-30-40-40-60-36 6 24 30 38 60 36z"></path><path d="M60 60c10-30 40-40 60-36-6 24-30 38-60 36z"></path></svg></div>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px">
+          <span style="font-family: 'Source Serif 4', Georgia, serif; font-style: italic; font-size: 17px">{{chosen.sci}}</span>
+          <span style="font-size: 14px; color: #3D4A42">{{chosen.common}}</span>
+          <span style="font-size: 12px; color: #4B5A51">Alstroemeriaceae · {{chosen.pct}} % IA</span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: flex-start; gap: 10px; background: #FFF1D6; color: #5C3800; border-radius: 16px; padding: 12px 14px">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"></path></svg>
+        <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 700">Posible nuevo registro local</span><span style="font-size: 13px; line-height: 1.45">No hay registros de esta especie en GBIF ni iNaturalist dentro de 5 km.</span></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <label for="notas" style="font-size: 14px; font-weight: 600">Notas de campo</label>
+        <textarea id="notas" rows="3" placeholder="Hábitat, número de individuos, fenología…" style="border-radius: 14px; border: 1px solid #D5E3DA; padding: 10px 12px; font-size: 15px; resize: none; color: #14231A"></textarea>
+      </div>
+      <label style="display: flex; align-items: center; gap: 12px; border: 1px solid #E3E9E5; border-radius: 16px; padding: 12px 14px; cursor: pointer">
+        <input type="checkbox" checked="{{publish}}" onChange="{{togglePublish}}" style="width: 22px; height: 22px; accent-color: #1E4D34">
+        <span style="display: flex; flex-direction: column"><span style="font-size: 15px; font-weight: 600">Publicar en iNaturalist</span><span style="font-size: 13px; color: #4B5A51">Se envía cuando haya conexión · licencia CC BY-NC</span></span>
+      </label>
+      <button onClick="{{go.s5}}" style="margin-top: auto; height: 56px; border-radius: 18px; border: none; background: #1E4D34; color: #FFFFFF; font-size: 16px; font-weight: 700">Guardar observación</button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{is.s5}}" hint-placeholder-val="{{false}}">
+    <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; gap: 14px; text-align: center">
+      <div style="width: 80px; height: 80px; border-radius: 999px; background: #DDEFE2; color: #1E4D34; display: flex; align-items: center; justify-content: center"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"></path></svg></div>
+      <h1 style="margin: 0; font-size: 26px; font-weight: 700">Observación guardada</h1>
+      <p style="margin: 0; font-size: 15px; line-height: 1.5; color: #3D4A42; max-width: 300px">{{doneText}}</p>
+      <div style="align-self: stretch; display: flex; flex-direction: column; gap: 8px; margin-top: 18px">
+        <a href="Observaciones.dc.html" style="height: 56px; border-radius: 18px; background: #1E4D34; color: #FFFFFF; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center">Ver mis observaciones</a>
+        <button onClick="{{go.s1}}" style="height: 48px; border-radius: 14px; border: none; background: #DDEFE2; color: #14231A; font-size: 15px; font-weight: 600">Registrar otra</button>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { step: 1, pick: 0, publish: true };
+  }
+  renderVals() {
+    const step = this.state.step;
+    const is = { s1: step === 1, s2: step === 2, s3: step === 3, s4: step === 4, s5: step === 5 };
+    const go = {};
+    [1, 2, 3, 4, 5].forEach((n) => { go['s' + n] = () => this.setState({ step: n }); });
+    const labels = ['Foto', 'Ubicación', 'Identificación', 'Guardar'];
+    const stepper = labels.map((label, i) => {
+      const n = i + 1;
+      const on = n <= Math.min(step, 4);
+      return { label, bar: on ? '#1E4D34' : '#D5E3DA', color: n === Math.min(step, 4) ? '#14231A' : '#4B5A51', weight: n === Math.min(step, 4) ? 700 : 500 };
+    });
+    const OPTS = [
+      { sci: 'Alstroemeria pelegrina', common: 'Mariposa de los sauces', pct: 81 },
+      { sci: 'Alstroemeria ligtu', common: 'Liuto', pct: 12 },
+      { sci: 'Alstroemeria pulchra', common: 'Flor de Aguila', pct: 5 }
+    ];
+    const options = OPTS.map((o, i) => {
+      const sel = this.state.pick === i;
+      return Object.assign({}, o, {
+        pressed: sel ? 'true' : 'false',
+        border: sel ? '2px solid #1E4D34' : '1px solid #D5E3DA',
+        dot: sel ? '#1E4D34' : 'transparent',
+        pick: () => this.setState({ pick: i })
+      });
+    });
+    return {
+      is,
+      go,
+      stepper,
+      options,
+      chosen: OPTS[this.state.pick],
+      publish: this.state.publish,
+      togglePublish: () => this.setState({ publish: !this.state.publish }),
+      doneText: this.state.publish
+        ? 'Quedó en tu colección como posible nuevo registro local y se publicará en iNaturalist al recuperar la conexión.'
+        : 'Quedó en tu colección como posible nuevo registro local. Puedes publicarla en iNaturalist más tarde.'
+    };
+  }
+}
+</script>
+</body>
+</html>

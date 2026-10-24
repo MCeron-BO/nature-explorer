@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Nature Explorer · Capturar y validar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=Source+Serif+4:ital,opsz,wght@1,8..60,400;1,8..60,600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1E4D34;text-decoration:none}a:hover{color:#14231A}
+button{font-family:inherit;cursor:pointer}
+@keyframes neFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes nePop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.06);opacity:1}100%{transform:scale(1)}}
+@keyframes neRing{0%{transform:scale(.4);opacity:.9}100%{transform:scale(1.5);opacity:0}}
+.ne-float{animation:neFloat 3.2s ease-in-out infinite}
+.ne-pop{animation:nePop .6s cubic-bezier(.2,.9,.3,1.2) both}
+.ne-ring{animation:neRing 1.6s ease-out infinite}
+.ne-ring2{animation:neRing 1.6s ease-out .5s infinite}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #FFFFFF; font-family: 'IBM Plex Sans', system-ui, sans-serif; color: #14231A">
+
+  <sc-if value="{{is.carta}}" hint-placeholder-val="{{true}}">
+    <div style="position: absolute; inset: 0; background: #1B271F; display: flex; flex-direction: column; align-items: center; padding: 20px 20px 28px; box-sizing: border-box; gap: 18px">
+      <div style="align-self: stretch; display: flex; align-items: center; justify-content: space-between">
+        <a href="Mapa.dc.html" aria-label="Cerrar y volver al mapa" style="width: 44px; height: 44px; border-radius: 999px; background: #2A382E; color: #FFFFFF; display: flex; align-items: center; justify-content: center">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+        </a>
+        <span style="font-size: 13px; font-weight: 600; color: #BFE3C8; letter-spacing: 0.06em; text-transform: uppercase">Especie encontrada</span>
+        <span style="width: 44px"></span>
+      </div>
+      <div class="ne-float" style="width: 310px; border-radius: 24px; background: #FFFFFF; padding: 10px; box-sizing: border-box; box-shadow: 0 20px 50px rgba(0,0,0,0.45); border: 3px solid #A9D4B4">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 6px 10px">
+          <span style="font-size: 12px; font-weight: 700; color: #1E4D34; letter-spacing: 0.04em">N.º 001 · FLORA</span>
+          <span style="font-size: 12px; font-weight: 600; color: #1C5A85; background: #EAF2F8; padding: 3px 8px; border-radius: 999px">Endémica de Chile</span>
+        </div>
+        <div style="height: 230px; border-radius: 16px; background: #CFE6D6; display: flex; align-items: center; justify-content: center; color: #2F6B49; position: relative">
+          <svg width="150" height="190" viewBox="0 0 150 190" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M60 190V40a15 15 0 0 1 30 0v150"></path><path d="M60 130H38a10 10 0 0 1-10-10V86a9 9 0 0 1 18 0v26"></path><path d="M90 110h22a10 10 0 0 0 10-10V70a9 9 0 0 0-18 0v22"></path><path d="M75 34v8M68 58v8M82 70v8M68 90v8M82 112v8M68 136v8"></path><path d="M67 28c2-8 14-8 16 0"></path></svg>
+          <span style="position: absolute; bottom: 10px; left: 12px; font-size: 11px; color: #2F4A3A">[Foto CC · iNaturalist]</span>
+        </div>
+        <div style="padding: 14px 8px 6px; display: flex; flex-direction: column; gap: 2px">
+          <div style="font-size: 28px; font-weight: 700; letter-spacing: -0.01em">Quisco</div>
+          <div style="font-family: 'Source Serif 4', Georgia, serif; font-style: italic; font-size: 19px; color: #2F4A3A">Echinopsis chiloensis</div>
+          <div style="font-size: 13px; color: #4B5A51">Cactaceae</div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 8px 4px 4px">
+          <div style="background: #EEF6F0; border-radius: 12px; padding: 8px; display: flex; flex-direction: column; align-items: center"><span style="font-size: 16px; font-weight: 700">8 m</span><span style="font-size: 11px; color: #4B5A51">Distancia</span></div>
+          <div style="background: #EEF6F0; border-radius: 12px; padding: 8px; display: flex; flex-direction: column; align-items: center"><span style="font-size: 16px; font-weight: 700">12</span><span style="font-size: 11px; color: #4B5A51">Reg. a 1 km</span></div>
+          <div style="background: #EEF6F0; border-radius: 12px; padding: 8px; display: flex; flex-direction: column; align-items: center"><span style="font-size: 16px; font-weight: 700">LC</span><span style="font-size: 11px; color: #4B5A51">UICN</span></div>
+        </div>
+      </div>
+      <div style="margin-top: auto; align-self: stretch; display: flex; flex-direction: column; gap: 10px; align-items: center">
+        <button onClick="{{go.capturada}}" style="align-self: stretch; height: 58px; border-radius: 18px; border: none; background: #A9D4B4; color: #14231A; font-size: 18px; font-weight: 700; letter-spacing: 0.08em">CAPTURAR</button>
+        <span style="font-size: 13px; color: #BFCFC4">Estás a 8 metros de un registro existente</span>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{is.capturada}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; background: #1B271F; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 28px; box-sizing: border-box; gap: 22px">
+      <div style="position: relative; width: 240px; height: 240px; display: flex; align-items: center; justify-content: center">
+        <div class="ne-ring" style="position: absolute; inset: 0; border-radius: 999px; border: 3px solid #A9D4B4"></div>
+        <div class="ne-ring2" style="position: absolute; inset: 0; border-radius: 999px; border: 2px solid #DDEFE2"></div>
+        <div class="ne-pop" style="width: 170px; border-radius: 20px; background: #FFFFFF; padding: 8px; box-sizing: border-box; border: 3px solid #A9D4B4; box-shadow: 0 16px 40px rgba(0,0,0,0.45)">
+          <div style="height: 140px; border-radius: 14px; background: #CFE6D6; color: #2F6B49; display: flex; align-items: center; justify-content: center">
+            <svg width="70" height="100" viewBox="0 0 150 190" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M60 190V40a15 15 0 0 1 30 0v150"></path><path d="M60 130H38a10 10 0 0 1-10-10V86a9 9 0 0 1 18 0v26"></path><path d="M90 110h22a10 10 0 0 0 10-10V70a9 9 0 0 0-18 0v22"></path></svg>
+          </div>
+          <div style="padding: 8px 4px 2px; font-size: 16px; font-weight: 700">Quisco</div>
+        </div>
+      </div>
+      <div class="ne-pop" style="display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center">
+        <div style="display: flex; align-items: center; gap: 8px; color: #A9D4B4">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"></path></svg>
+          <span style="font-size: 34px; font-weight: 700; letter-spacing: 0.02em">¡CAPTURADA!</span>
+        </div>
+        <div style="font-size: 22px; font-weight: 600; color: #FFFFFF">Quisco</div>
+        <div style="font-family: 'Source Serif 4', Georgia, serif; font-style: italic; font-size: 18px; color: #DDEFE2">Echinopsis chiloensis</div>
+        <div style="margin-top: 6px; font-size: 14px; color: #BFCFC4">Añadida temporalmente a tu colección</div>
+      </div>
+      <button onClick="{{go.validar}}" style="align-self: stretch; height: 56px; border-radius: 18px; border: none; background: #A9D4B4; color: #14231A; font-size: 16px; font-weight: 700; margin-top: 20px">Continuar</button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{is.white}}" hint-placeholder-val="{{false}}">
+    <div style="display: flex; align-items: center; gap: 6px; padding: 18px 20px 0; font-size: 12px; font-weight: 600; color: #4B5A51">
+      <span style="color: #1E4D34">Capturar</span>
+      <span style="flex: 1; height: 3px; border-radius: 3px; background: #1E4D34"></span>
+      <span style="color: {{progress.vColor}}">Validar</span>
+      <span style="flex: 1; height: 3px; border-radius: 3px; background: {{progress.bar2}}"></span>
+      <span style="color: {{progress.cColor}}">Coleccionar</span>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{is.validar}}" hint-placeholder-val="{{false}}">
+    <div style="display: flex; flex-direction: column; padding: 36px 24px 28px; gap: 20px; height: 790px; box-sizing: border-box">
+      <div style="width: 72px; height: 72px; border-radius: 999px; background: #DDEFE2; color: #1E4D34; display: flex; align-items: center; justify-content: center">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"></path></svg>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <span style="align-self: flex-start; font-size: 13px; font-weight: 700; color: #1E4D34; background: #DDEFE2; padding: 4px 10px; border-radius: 999px">Capturada</span>
+        <h1 style="margin: 0; font-size: 28px; line-height: 1.2; font-weight: 700">Ahora valídala a tu alrededor.</h1>
+        <p style="margin: 0; font-size: 16px; line-height: 1.5; color: #3D4A42">Agrega una fotografía para confirmar la observación.</p>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; border: 1px solid #E3E9E5; border-radius: 16px; padding: 12px">
+        <div style="width: 48px; height: 48px; border-radius: 12px; background: #CFE6D6; color: #2F6B49; display: flex; align-items: center; justify-content: center"><svg width="22" height="26" viewBox="0 0 150 190" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" aria-hidden="true"><path d="M60 190V40a15 15 0 0 1 30 0v150"></path><path d="M60 130H38a10 10 0 0 1-10-10V86"></path><path d="M90 110h22a10 10 0 0 0 10-10V70"></path></svg></div>
+        <div style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 16px; font-weight: 600">Quisco</span><span style="font-family: 'Source Serif 4', Georgia, serif; font-style: italic; font-size: 14px; color: #3D4A42">Echinopsis chiloensis</span></div>
+        <span style="font-size: 12px; font-weight: 600; color: #9A3F07; background: #FBEFE6; padding: 4px 8px; border-radius: 999px">Pendiente</span>
+      </div>
+      <div style="background: #F5F8F6; border-radius: 16px; padding: 14px 16px; font-size: 14px; line-height: 1.5; color: #3D4A42">La captura queda pendiente hasta que confirmes la planta con una foto real. Así cada especie de tu colección es una observación verificable.</div>
+      <div style="margin-top: auto; display: flex; flex-direction: column; gap: 8px">
+        <button onClick="{{go.camara}}" style="height: 56px; border-radius: 18px; border: none; background: #1E4D34; color: #FFFFFF; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"></path><circle cx="12" cy="13" r="3.5"></circle></svg>Agregar fotografía
+        </button>
+        <a href="Observaciones.dc.html" style="height: 48px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600">Validar más tarde</a>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{is.camara}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; background: #0E1410; display: flex; flex-direction: column">
+      <div style="flex: 1; position: relative; background: #1E2A21; overflow: hidden">
+        <svg width="390" height="660" viewBox="0 0 390 660" fill="none" stroke="#3E5A45" stroke-width="3" stroke-linecap="round" aria-hidden="true" style="position: absolute; inset: 0"><path d="M170 660V250a25 25 0 0 1 50 0v410"></path><path d="M170 470h-40a16 16 0 0 1-16-16v-70a14 14 0 0 1 28 0v54"></path><path d="M220 420h40a16 16 0 0 0 16-16v-60a14 14 0 0 0-28 0v44"></path><path d="M0 600c60-20 120-10 170 10M220 610c60-20 120-30 170-10"></path></svg>
+        <div style="position: absolute; left: 70px; top: 190px; width: 250px; height: 300px">
+          <span style="position: absolute; left: 0; top: 0; width: 32px; height: 32px; border-left: 3px solid #FFFFFF; border-top: 3px solid #FFFFFF; border-radius: 6px 0 0 0"></span>
+          <span style="position: absolute; right: 0; top: 0; width: 32px; height: 32px; border-right: 3px solid #FFFFFF; border-top: 3px solid #FFFFFF; border-radius: 0 6px 0 0"></span>
+          <span style="position: absolute; left: 0; bottom: 0; width: 32px; height: 32px; border-left: 3px solid #FFFFFF; border-bottom: 3px solid #FFFFFF; border-radius: 0 0 0 6px"></span>
+          <span style="position: absolute; right: 0; bottom: 0; width: 32px; height: 32px; border-right: 3px solid #FFFFFF; border-bottom: 3px solid #FFFFFF; border-radius: 0 0 6px 0"></span>
+        </div>
+        <div style="position: absolute; top: 16px; left: 16px; right: 16px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px">
+          <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.94); border-radius: 14px; padding: 8px 12px 8px 8px; border: 2px solid #A9D4B4">
+            <div style="width: 38px; height: 38px; border-radius: 10px; background: #CFE6D6; color: #2F6B49; display: flex; align-items: center; justify-content: center"><svg width="18" height="22" viewBox="0 0 150 190" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" aria-hidden="true"><path d="M60 190V40a15 15 0 0 1 30 0v150"></path><path d="M60 130H38a10 10 0 0 1-10-10V86"></path><path d="M90 110h22a10 10 0 0 0 10-10V70"></path></svg></div>
+            <div style="display: flex; flex-direction: column"><span style="font-size: 14px; font-weight: 700">Quisco</span><span style="font-family: 'Source Serif 4', Georgia, serif; font-style: italic; font-size: 13px; color: #3D4A42">Echinopsis chiloensis</span></div>
+          </div>
+          <button onClick="{{go.validar}}" aria-label="Cerrar cámara" style="width: 44px; height: 44px; border-radius: 999px; border: none; background: rgba(0,0,0,0.5); color: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+        </div>
+        <div style="position: absolute; left: 24px; right: 24px; bottom: 20px; background: rgba(14,20,16,0.78); color: #FFFFFF; border-radius: 14px; padding: 12px 14px; font-size: 14px; line-height: 1.45; text-align: center">Busca la planta a tu alrededor y toma una fotografía para validar la observación.</div>
+      </div>
+      <div style="height: 184px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px">
+        <div style="display: flex; gap: 14px; font-size: 12px; color: #BFCFC4"><span>GPS ±4 m</span><span>·</span><span>24 oct 2026</span></div>
+        <div style="display: flex; align-items: center; justify-content: center; gap: 44px">
+          <button aria-label="Elegir de la galería" style="width: 48px; height: 48px; border-radius: 12px; border: 1px solid #3E5A45; background: #1E2A21; color: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m3 16 5-5 4 4 3-3 6 6"></path></svg></button>
+          <button onClick="{{go.ia}}" aria-label="Tomar fotografía" style="width: 78px; height: 78px; border-radius: 999px; border: 4px solid #FFFFFF; background: transparent; padding: 5px"><span style="display: block; width: 100%; height: 100%; border-radius: 999px; background: #FFFFFF"></span></button>
+          <button aria-label="Cambiar cámara" style="width: 48px; height: 48px; border-radius: 999px; border: 1px solid #3E5A45; background: #1E2A21; color: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3L20 9"></path><path d="M20 4v5h-5"></path><path d="M20 12a8 8 0 0 1-14 5.3L4 15"></path><path d="M4 20v-5h5"></path></svg></button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{is.ia}}" hint-placeholder-val="{{false}}">
+    <div style="display: flex; flex-direction: column; padding: 22px 20px 24px; gap: 16px; height: 790px; box-sizing: border-box">
+      <div style="display: flex; gap: 12px; align-items: center">
+        <div style="width: 84px; height: 84px; border-radius: 14px; background: #2A3A2E; color: #8FB59A; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="34" height="44" viewBox="0 0 150 190" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" aria-hidden="true"><path d="M60 190V40a15 15 0 0 1 30 0v150"></path><path d="M60 130H38a10 10 0 0 1-10-10V86"></path><path d="M90 110h22a10 10 0 0 0 10-10V70"></path></svg></div>
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <span style="font-size: 12px; font-weight: 700; color: #1E4D34; letter-spacing: 0.06em; text-transform: uppercase">Identificación IA</span>
+          <span style="font-size: 20px; font-weight: 700">Análisis completado</span>
+          <span style="font-size: 13px; color: #4B5A51">Tu foto · 24 oct 2026 · ±4 m</span>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px; background: #F5F8F6; border-radius: 16px; padding: 12px 14px">
+        <span style="font-size: 13px; font-weight: 600; color: #3D4A42">La IA comparó</span>
+        <sc-for list="{{criteria}}" as="c" hint-placeholder-count="5">
+          <div style="display: flex; align-items: center; gap: 10px; font-size: 14px">
+            <span style="width: 20px; height: 20px; border-radius: 999px; background: #1E4D34; color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"></path></svg></span>
+            <span style="flex: 1">{{c.label}}</span>
+            <span style="font-size: 12px; color: #4B5A51">{{c.detail}}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <span style="font-size: 15px; font-weight: 700">Posibles coincidencias</span>
+        <sc-for list="{{matches}}" as="m" hint-placeholder-count="3">
+          <div style="display: flex; flex-direction: column; gap: 6px; border: 1px solid #E3E9E5; border-radius: 14px; padding: 10px 12px">
+            <div style="display: flex; justify-content: space-between; align-items: baseline">
+              <div style="display: flex; flex-direction: column"><span style="font-family: 'Source Serif 4', Georgia, serif; font-style: italic; font-size: 16px">{{m.sci}}</span><span style="font-size: 13px; color: #4B5A51">{{m.common}}</span></div>
+              <span style="font-size: 18px; font-weight: 700; color: #1E4D34">{{m.pct}} %</span>
+            </div>
+            <div style="height: 6px; border-radius: 6px; background: #E3E9E5; overflow: hidden"><div style="height: 6px; width: {{m.w}}; background: #2F6B49; border-radius: 6px"></div></div>
+          </div>
+        </sc-for>
+      </div>
+      <button onClick="{{go.resultado}}" style="margin-top: auto; height: 56px; border-radius: 18px; border: none; background: #1E4D34; color: #FFFFFF; font-size: 16px; font-weight: 700">Confirmar <i style="font-family: 'Source Serif 4', Georgia, serif">Echinopsis chiloensis</i></button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{is.resultado}}" hint-placeholder-val="{{false}}">
+    <div style="display: flex; flex-direction: column; padding: 36px 24px 24px; gap: 18px; height: 790px; box-sizing: border-box">
+      <div style="width: 80px; height: 80px; border-radius: 999px; background: {{res.bg}}; color: {{res.fg}}; display: flex; align-items: center; justify-content: center">
+        <sc-if value="{{res.isVal}}" hint-placeholder-val="{{true}}"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"></path></svg></sc-if>
+        <sc-if value="{{res.isLocal}}" hint-placeholder-val="{{false}}"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"></path></svg></sc-if>
+        <sc-if value="{{res.isAmp}}" hint-placeholder-val="{{false}}"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"></path></svg></sc-if>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <span style="align-self: flex-start; font-size: 13px; font-weight: 700; color: {{res.fg}}; background: {{res.bg}}; padding: 4px 10px; border-radius: 999px">{{res.tag}}</span>
+        <h1 style="margin: 0; font-size: 28px; line-height: 1.2; font-weight: 700">{{res.title}}</h1>
+        <p style="margin: 0; font-size: 16px; line-height: 1.5; color: #3D4A42">{{res.body}}</p>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; border: 2px solid #A9D4B4; border-radius: 16px; padding: 12px">
+        <div style="width: 52px; height: 52px; border-radius: 12px; background: #CFE6D6; color: #2F6B49; display: flex; align-items: center; justify-content: center"><svg width="22" height="28" viewBox="0 0 150 190" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" aria-hidden="true"><path d="M60 190V40a15 15 0 0 1 30 0v150"></path><path d="M60 130H38a10 10 0 0 1-10-10V86"></path><path d="M90 110h22a10 10 0 0 0 10-10V70"></path></svg></div>
+        <div style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 16px; font-weight: 600">Quisco</span><span style="font-family: 'Source Serif 4', Georgia, serif; font-style: italic; font-size: 14px; color: #3D4A42">Echinopsis chiloensis</span></div>
+        <div style="display: flex; flex-direction: column; align-items: flex-end"><span style="font-size: 18px; font-weight: 700; color: #1E4D34">94 %</span><span style="font-size: 11px; color: #4B5A51">confianza</span></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: #3D4A42; background: #F5F8F6; border-radius: 16px; padding: 12px 14px">
+        <div style="display: flex; justify-content: space-between"><span>Registros cercanos</span><span style="font-weight: 600; color: #14231A">{{res.near}}</span></div>
+        <div style="display: flex; justify-content: space-between"><span>Fuente de referencia</span><span style="font-weight: 600; color: #14231A">GBIF · iNaturalist</span></div>
+        <div style="display: flex; justify-content: space-between"><span>Estado en tu colección</span><span style="font-weight: 600; color: #1E4D34">Validada</span></div>
+      </div>
+      <div style="margin-top: auto; display: flex; flex-direction: column; gap: 8px">
+        <a href="Observaciones.dc.html" style="height: 56px; border-radius: 18px; background: #1E4D34; color: #FFFFFF; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center">Ver en mi colección</a>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+          <button style="height: 48px; border-radius: 14px; border: 1px solid #D5E3DA; background: #FFFFFF; color: #14231A; font-size: 14px; font-weight: 600">Publicar en iNaturalist</button>
+          <a href="Mapa.dc.html" style="height: 48px; border-radius: 14px; background: #DDEFE2; color: #14231A; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center">Volver al mapa</a>
+        </div>
+        <button onClick="{{go.carta}}" style="height: 36px; border: none; background: transparent; color: #4B5A51; font-size: 13px">Reiniciar demostración</button>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"resultado":{"editor":"enum","options":["validada","nuevo_local","ampliacion"],"default":"validada"},"pantalla":{"editor":"enum","options":["carta","capturada","validar","camara","ia","resultado"],"default":"carta"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { step: null };
+  }
+  componentDidUpdate(prev) {
+    if (prev.pantalla !== this.props.pantalla && this.state.step !== null) this.setState({ step: null });
+  }
+  renderVals() {
+    const step = this.state.step ?? this.props.pantalla ?? 'carta';
+    const steps = ['carta', 'capturada', 'validar', 'camara', 'ia', 'resultado'];
+    const is = {};
+    steps.forEach((s) => { is[s] = step === s; });
+    is.white = step === 'validar' || step === 'ia' || step === 'resultado';
+    const go = {};
+    steps.forEach((s) => { go[s] = () => this.setState({ step: s }); });
+    const done = step === 'resultado';
+    const v = this.props.resultado ?? 'validada';
+    const RES = {
+      validada: { tag: 'Observación validada', title: 'Registro cercano confirmado.', body: 'Esta especie ya posee registros cercanos. Tu observación fue agregada a tu colección.', near: '12 en 1 km', bg: '#DDEFE2', fg: '#1E4D34' },
+      nuevo_local: { tag: 'Posible nuevo registro local', title: 'No hay registros cercanos de esta especie.', body: 'No existen registros cercanos para esta especie dentro del radio seleccionado. Tu observación queda marcada para revisión de la comunidad.', near: '0 en 5 km', bg: '#FFF1D6', fg: '#7A4A00' },
+      ampliacion: { tag: 'Posible ampliación de distribución', title: 'Fuera del rango conocido.', body: 'La especie no tiene registros en esta región. Si la comunidad lo confirma, tu observación ampliaría su distribución conocida.', near: '0 en 50 km', bg: '#EAF2F8', fg: '#1C5A85' }
+    };
+    const res = Object.assign({}, RES[v] || RES.validada, { isVal: v === 'validada', isLocal: v === 'nuevo_local', isAmp: v === 'ampliacion' });
+    return {
+      is,
+      go,
+      res,
+      progress: {
+        vColor: '#1E4D34',
+        cColor: done ? '#1E4D34' : '#4B5A51',
+        bar2: done ? '#1E4D34' : '#D5E3DA'
+      },
+      criteria: [
+        { label: 'Fotografía del usuario', detail: 'Tallo columnar, espinas' },
+        { label: 'Distribución geográfica', detail: 'Dentro del rango' },
+        { label: 'Época del año', detail: 'Octubre · floración' },
+        { label: 'Registros cercanos', detail: '12 en 1 km' },
+        { label: 'Catálogo taxonómico', detail: 'GBIF Backbone' }
+      ],
+      matches: [
+        { sci: 'Echinopsis chiloensis', common: 'Quisco', pct: 94, w: '94%' },
+        { sci: 'Eulychnia acida', common: 'Copao', pct: 4, w: '4%' },
+        { sci: 'Eulychnia castanea', common: 'Copao de Philippi', pct: 2, w: '2%' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

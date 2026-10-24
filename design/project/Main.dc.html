@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Nature Explorer · Inicio</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=Source+Serif+4:ital,opsz,wght@1,8..60,400;1,8..60,600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1E4D34;text-decoration:none}a:hover{color:#14231A}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #FFFFFF; font-family: 'IBM Plex Sans', system-ui, sans-serif; color: #14231A; display: flex; flex-direction: column; padding: 28px 20px 20px; gap: 22px">
+
+  <header style="display: flex; flex-direction: column; gap: 10px">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <div style="width: 40px; height: 40px; border-radius: 12px; background: {{primary}}; display: flex; align-items: center; justify-content: center; color: #FFFFFF">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19c0-8 5-14 15-14 0 10-6 15-14 15"></path><path d="M5 19 13 11"></path></svg>
+      </div>
+      <div style="font-size: 22px; font-weight: 700; letter-spacing: -0.01em">Nature Explorer</div>
+    </div>
+    <div style="font-family: 'Source Serif 4', Georgia, serif; font-style: italic; font-size: 19px; color: #2F6B49">Explora. Conoce. Conserva.</div>
+    <div style="font-size: 15px; color: #4B5A51">¿Qué quieres explorar hoy?</div>
+  </header>
+
+  <main style="display: flex; flex-direction: column; gap: 14px">
+    <a href="Mapa.dc.html" style="display: flex; flex-direction: column; border-radius: 20px; overflow: hidden; border: 1px solid #D5E3DA; background: #FFFFFF; box-shadow: 0 6px 20px rgba(20,35,26,0.08)">
+      <div style="height: 128px; background: #CFE6D6; position: relative; overflow: hidden">
+        <svg width="350" height="128" viewBox="0 0 350 128" fill="none" stroke="#2F6B49" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M60 128V48a12 12 0 0 1 24 0v80"></path><path d="M60 92H48a8 8 0 0 1-8-8V66"></path><path d="M84 80h12a8 8 0 0 0 8-8V58"></path><path d="M72 44v6M66 60v6M78 70v6"></path>
+          <path d="M150 128c0-30 10-52 30-66"></path><path d="M180 62c-14 2-26-6-30-18 14-2 26 6 30 18z"></path><path d="M164 92c-16-2-26-12-28-24 16 2 26 12 28 24z"></path><path d="M170 82c10-10 24-14 36-10-6 12-20 16-36 10z"></path>
+          <path d="M250 128v-50"></path><path d="M250 78c-18-4-26-18-24-34 18 4 26 18 24 34z"></path><path d="M250 78c18-4 26-18 24-34-18 4-26 18-24 34z"></path><circle cx="300" cy="52" r="10"></circle><path d="M300 62v66"></path><path d="M300 96c10-4 18-2 24 4"></path>
+          <path d="M0 122c40-6 80-6 120 0s100 6 140 0 70-6 90 0"></path>
+        </svg>
+        <div style="position: absolute; top: 12px; right: 12px; background: #1E4D34; color: #FFFFFF; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px">Disponible</div>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 16px">
+        <div style="display: flex; flex-direction: column; gap: 2px">
+          <div style="font-size: 20px; font-weight: 700; color: #14231A">Flora</div>
+          <div style="font-size: 13px; color: #4B5A51">Árboles, arbustos, cactus y hierbas</div>
+        </div>
+        <div style="width: 44px; height: 44px; border-radius: 999px; background: {{primary}}; color: #FFFFFF; display: flex; align-items: center; justify-content: center">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"></path></svg>
+        </div>
+      </div>
+    </a>
+
+    <div aria-disabled="true" style="display: flex; flex-direction: column; border-radius: 20px; overflow: hidden; border: 1px solid #E3E9E5; background: #FFFFFF">
+      <div style="height: 104px; background: #EEF2EF; position: relative; overflow: hidden">
+        <svg width="350" height="104" viewBox="0 0 350 104" fill="none" stroke="#7F8F85" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="70" cy="66" r="12"></circle><circle cx="50" cy="44" r="6"></circle><circle cx="64" cy="34" r="6"></circle><circle cx="80" cy="36" r="6"></circle><circle cx="92" cy="48" r="6"></circle>
+          <path d="M170 70c20-30 60-34 80-14"></path><path d="M250 56l18-6-10 14"></path><circle cx="236" cy="54" r="2"></circle><path d="M200 64c6 10 18 14 30 10"></path><path d="M196 80v14M214 82v12"></path>
+          <path d="M290 30c10 0 16 8 16 16"></path><path d="M300 22c16 0 26 12 26 26"></path>
+        </svg>
+        <div style="position: absolute; top: 12px; right: 12px; background: #FFFFFF; color: #4B5A51; border: 1px solid #D5DED8; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px">Próximamente</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px; padding: 12px 16px">
+        <div style="font-size: 18px; font-weight: 700; color: #3D4A42">Fauna</div>
+        <div style="font-size: 13px; color: #4B5A51">Aves, mamíferos, reptiles e insectos</div>
+      </div>
+    </div>
+
+    <div aria-disabled="true" style="display: flex; flex-direction: column; border-radius: 20px; overflow: hidden; border: 1px solid #E3E9E5; background: #FFFFFF">
+      <div style="height: 104px; background: #F1EFEA; position: relative; overflow: hidden">
+        <svg width="350" height="104" viewBox="0 0 350 104" fill="none" stroke="#8A8174" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M40 60c0-20 18-34 40-34s40 14 40 34z"></path><path d="M70 60v30c0 4 4 6 10 6s10-2 10-6V60"></path><circle cx="66" cy="44" r="3"></circle><circle cx="90" cy="40" r="3"></circle>
+          <path d="M170 74c0-12 10-20 22-20s22 8 22 20z"></path><path d="M186 74v18M198 74v18"></path>
+          <path d="M260 52c0-14 12-24 28-24s28 10 28 24z"></path><path d="M282 52v40M294 52v40"></path><path d="M0 98h350"></path>
+        </svg>
+        <div style="position: absolute; top: 12px; right: 12px; background: #FFFFFF; color: #4B5A51; border: 1px solid #D5DED8; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px">Próximamente</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px; padding: 12px 16px">
+        <div style="font-size: 18px; font-weight: 700; color: #3D4A42">Hongos</div>
+        <div style="font-size: 13px; color: #4B5A51">Setas, líquenes y mohos</div>
+      </div>
+    </div>
+  </main>
+
+  <footer style="margin-top: auto; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; color: #4B5A51">
+    <span>Datos abiertos de</span><span style="font-weight: 600; color: #14231A">GBIF</span><span>·</span><span style="font-weight: 600; color: #14231A">iNaturalist</span>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"primary":{"editor":"color","default":"#1E4D34","options":["#1E4D34","#2F5D3A","#24453F"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { primary: this.props.primary ?? '#1E4D34' };
+  }
+}
+</script>
+</body>
+</html>
