@@ -209,7 +209,8 @@ const findSp = (id) => S.species.find((s) => s.id === id) || S.ficha?.sp || S.co
 let map, circle, userMarker, pointsLayer, selRing;
 function initMap() {
   if (map) return;
-  map = L.map('map', { zoomControl: false, attributionControl: true, preferCanvas: true }).setView([S.pos.lat, S.pos.lng], 14);
+  // Sin franja de atribución: los créditos de las imágenes (exigidos por Esri) están en el botón «i» del mapa.
+  map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([S.pos.lat, S.pos.lng], 14);
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Imágenes © Esri, Maxar, Earthstar Geographics' }).addTo(map);
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, opacity: 0.8 }).addTo(map);
   pointsLayer = L.layerGroup().addTo(map);
@@ -986,6 +987,7 @@ function locate() {
 }
 $('#btn-locate').addEventListener('click', locate);
 $('#btn-ajustes').addEventListener('click', openSettings);
+$('#btn-credits').addEventListener('click', () => toast('Imágenes © Esri, Maxar, Earthstar Geographics · Mapa con Leaflet · Datos: GBIF, iNaturalist'));
 $('#btn-here').addEventListener('click', () => { const c = map.getCenter(); settings.demo = true; setPos(c.lat, c.lng, `${c.lat.toFixed(4)}, ${c.lng.toFixed(4)}`); });
 window.addEventListener('hashchange', show);
 
