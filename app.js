@@ -94,7 +94,9 @@ const I = {
   ext: '<svg viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px"><path d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5"/></svg>',
   lock: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
   img: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/></svg>',
-  right: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>'
+  right: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>',
+  up: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 15 7-7 7 7"/></svg>',
+  down: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg>'
 };
 const thumb = (url, cls = '') => `<div class="thumb ${cls}" style="${url ? `background-image:url('${esc(url)}')` : ''}">${url ? '' : I.leaf}</div>`;
 
@@ -112,7 +114,8 @@ const S = {
   nearest: null,
   filter: 'todas',
   q: '',
-  sheetOpen: false,
+  sheet: ['min', 'mid', 'open'].includes(settings.sheet) ? settings.sheet : 'mid',
+  selected: null,
   dlFmt: 'csv',
   capture: null,
   nuevo: null,
@@ -203,7 +206,7 @@ async function loadArea() {
 const findSp = (id) => S.species.find((s) => s.id === id) || S.ficha?.sp || S.collection.find((c) => c.id === id);
 
 /* ---------- mapa ---------- */
-let map, circle, userMarker, pointsLayer;
+let map, circle, userMarker, pointsLayer, selRing;
 function initMap() {
   if (map) return;
   map = L.map('map', { zoomControl: false, attributionControl: true, preferCanvas: true }).setView([S.pos.lat, S.pos.lng], 14);
@@ -214,8 +217,19 @@ function initMap() {
   userMarker = L.marker([S.pos.lat, S.pos.lng], { icon: L.divIcon({ className: '', html: '<div class="user-dot"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }), zIndexOffset: 1000, interactive: false }).addTo(map);
   map.on('movestart', () => $('#crosshair').classList.add('on'));
   map.on('moveend', () => setTimeout(() => $('#crosshair').classList.remove('on'), 900));
+  map.on('click', () => selectPoint(null));
   fitRadius();
   renderPoints();
+}
+// Tocar una planta del mapa abre su ficha de captura; tocar el mapa vacío o la X la cierra.
+function selectPoint(p) {
+  S.selected = p;
+  if (selRing) { selRing.remove(); selRing = null; }
+  if (p && map) {
+    selRing = L.circleMarker([p.lat, p.lng], { radius: 13, weight: 3, color: '#FFFFFF', fill: false, interactive: false }).addTo(map);
+    if (S.sheet === 'open') { S.sheet = 'mid'; renderSheet(); }
+  }
+  renderNear();
 }
 function fitRadius() { if (map && circle) map.fitBounds(circle.getBounds(), { paddingTopLeft: [10, 120], paddingBottomRight: [10, 260] }); }
 function setPos(lat, lng, label) {
@@ -234,11 +248,13 @@ function renderPoints() {
     const m = L.circleMarker([p.lat, p.lng], {
       radius: p.src === 'inat' ? 6 : 4, weight: 2,
       color: thr ? '#A8460A' : p.src === 'inat' ? '#1E4D34' : '#1C5A85',
-      fillColor: thr ? '#F6D7BF' : p.src === 'inat' ? '#DDEFE2' : '#CFE3F2', fillOpacity: 1
+      fillColor: thr ? '#F6D7BF' : p.src === 'inat' ? '#DDEFE2' : '#CFE3F2', fillOpacity: 1,
+      bubblingMouseEvents: false
     });
-    m.bindPopup(() => `<div class="pop">${thumb(p.sp.photo, 'sm')}<div><div style="font-weight:600">${esc(p.sp.common || p.sp.sci)}</div><div class="sci" style="font-size:13px">${esc(p.sp.sci)}</div><div style="font-size:12px" class="muted">${p.src === 'inat' ? 'iNaturalist' : 'GBIF'} · ${fmtDist(dist(S.pos, p))}</div><a href="#ficha/${esc(p.sp.id)}">Ver ficha</a></div></div>`);
+    m.on('click', () => selectPoint(p));
     pointsLayer.addLayer(m);
   }
+  if (S.selected && !S.points.includes(S.selected)) selectPoint(null);
 }
 function renderRadii() {
   $('#radii').innerHTML = '<b>Radio</b>' + RADII.map((k) => `<button class="rad ${k === S.radius ? 'on' : ''}" data-r="${k}" aria-pressed="${k === S.radius}">${k} km</button>`).join('');
@@ -246,28 +262,50 @@ function renderRadii() {
 }
 function renderNear() {
   const el = $('#near-card');
-  const n = S.nearest;
-  const can = n && (settings.demo || n.d <= settings.capture);
-  if (!n || S.sheetOpen || S.loading) { el.classList.remove('on'); return; }
+  const p = S.selected;
+  if (!p || S.loading) { el.classList.remove('on'); return; }
+  const d = dist(S.pos, p);
+  const can = settings.demo || d <= settings.capture;
   el.classList.add('on');
-  el.innerHTML = `<div class="near">${thumb(n.sp.photo)}<div class="info"><span class="over">${can ? 'Registro cercano' : 'Registro más cercano'}</span><b style="font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(n.sp.common || n.sp.sci)}</b><span class="sci" style="font-size:14px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(n.sp.sci)}</span></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px"><span style="font-size:13px;font-weight:600;display:flex;gap:3px;align-items:center">${I.pin.replace('aria-hidden', 'style="width:14px;height:14px" aria-hidden')}${fmtDist(n.d)}</span>${can ? `<button class="cap" data-capture="${esc(n.sp.id)}">CAPTURAR</button>` : `<span style="font-size:11px" class="muted">Acércate a ${settings.capture} m</span>`}</div></div>`;
+  el.innerHTML = `<div class="near">
+    <button class="near-x" data-act="near-close" aria-label="Cerrar sin capturar">${I.x}</button>
+    ${thumb(p.sp.photo)}
+    <div class="info"><span class="over">${p.src === 'inat' ? 'Registro iNaturalist' : 'Registro GBIF'}</span><b style="font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.sp.common || p.sp.sci)}</b><span class="sci" style="font-size:14px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.sp.sci)}</span>
+      <span style="font-size:12px;display:flex;gap:10px;align-items:center;margin-top:2px"><span style="font-weight:600;display:flex;gap:3px;align-items:center">${I.pin.replace('aria-hidden', 'style="width:13px;height:13px" aria-hidden')}${fmtDist(d)}</span><a href="#ficha/${esc(p.sp.id)}" style="font-weight:600">Ver ficha</a></span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;padding-top:18px">${can ? `<button class="cap" data-capture="${esc(p.sp.id)}" data-d="${Math.round(d)}">CAPTURAR</button>` : `<span style="font-size:11px;max-width:80px;text-align:right" class="muted">Acércate a ${settings.capture} m para capturar</span>`}</div>
+  </div>`;
   requestAnimationFrame(() => { el.style.bottom = `${$('#sheet').offsetHeight + 12}px`; });
+}
+function setSheet(state) {
+  S.sheet = state;
+  settings.sheet = state;
+  saveSettings();
+  renderSheet();
 }
 function renderSheet() {
   const sh = $('#sheet');
   const c = S.counts;
+  if (S.sheet === 'min') {
+    sh.classList.add('min');
+    sh.innerHTML = `<button class="sheet-min" data-act="sheet-up" aria-label="Mostrar panel de especies">
+      <span>${S.loading ? 'Consultando GBIF e iNaturalist…' : S.error ? 'No se pudieron cargar las especies' : `<b>${nf(c.total)} especies</b> <span class="muted">· radio ${S.radius} km</span>`}</span>${I.up}</button>`;
+    renderNear();
+    return;
+  }
+  sh.classList.remove('min');
+  const open = S.sheet === 'open';
   let body;
   if (S.loading) body = '<div class="state" style="padding:16px"><div class="spinner"></div>Consultando GBIF e iNaturalist…</div>';
   else if (S.error) body = `<div class="state" style="padding:16px">${esc(S.error)}<button class="btn light" data-act="reload" style="width:auto">Reintentar</button></div>`;
   else body = `
     <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin-top:-6px">
       <div><div style="font-size:19px;font-weight:700">${nf(c.total)} especies encontradas</div><div class="muted" style="font-size:13px">Radio ${S.radius} km · iNaturalist ${nf(S.inatTotal)} · GBIF ${nf(S.gbifSpecies)}</div></div>
-      <a href="#especies" style="font-size:14px;font-weight:600;padding:8px 0">Ver listado</a>
+      <div style="display:flex;align-items:center;gap:4px"><a href="#especies" style="font-size:14px;font-weight:600;padding:8px 0">Ver listado</a><button class="x" data-act="sheet-min" aria-label="Minimizar panel" style="margin-right:-12px">${I.down}</button></div>
     </div>
     <div class="tiles"><div class="tile t-g"><b>${nf(c.native)}</b><span>Nativas</span></div><div class="tile t-b"><b>${nf(c.endemic)}</b><span>Endémicas</span></div><div class="tile t-o"><b>${nf(c.threatened)}</b><span>Amenazadas</span></div></div>`;
-  const list = S.sheetOpen && !S.loading && !S.error
+  const list = open && !S.loading && !S.error
     ? `<div class="list"><div class="over" style="color:var(--muted);padding:4px 0">Más cercanas</div>${S.species.slice(0, 12).map(spRow).join('')}</div>` : '';
-  sh.innerHTML = `<button class="handle" data-act="sheet" aria-label="${S.sheetOpen ? 'Contraer panel' : 'Expandir panel'}"><i></i></button>${body}
+  sh.innerHTML = `<button class="handle" data-act="sheet" aria-label="${open ? 'Contraer panel' : 'Expandir panel'}"><i></i></button>${body}
     <div class="two"><button class="btn" data-act="capture-nearest">${I.cam}Capturar</button><a class="btn light" href="#nuevo">${I.star}Nuevo registro</a></div>${list}`;
   renderNear();
 }
@@ -585,11 +623,12 @@ function addToCollection(entry) {
 }
 
 /* ---------- captura ---------- */
-function startCapture(id) {
+function startCapture(id, d) {
   const sp = findSp(id);
   if (!sp) return;
   const p = S.points.filter((x) => x.sp === sp).sort((a, b) => dist(S.pos, a) - dist(S.pos, b))[0];
-  S.capture = { sp, step: 'carta', d: p ? dist(S.pos, p) : sp.dist, uid: `c${Date.now()}` };
+  S.capture = { sp, step: 'carta', d: d ?? (p ? dist(S.pos, p) : sp.dist), uid: `c${Date.now()}` };
+  selectPoint(null);
   location.hash = '#captura';
 }
 const RES = {
@@ -885,7 +924,7 @@ document.addEventListener('click', async (e) => {
   if (!t) { if (e.target.id === 'modal') closeModal(); return; }
   const d = t.dataset;
   if (d.r) { S.radius = Number(d.r); saveSettings(); renderRadii(); if (circle) { circle.setRadius(S.radius * 1000); fitRadius(); } loadArea(); return; }
-  if (d.capture) { startCapture(d.capture); return; }
+  if (d.capture) { startCapture(d.capture, d.d != null ? Number(d.d) : undefined); return; }
   if (d.filter) { S.filter = d.filter; renderEspecies(); return; }
   if (d.fmt) { S.dlFmt = d.fmt; openDownload(); return; }
   if (d.step === 'capturada') playCaptureSound();
@@ -906,12 +945,17 @@ document.addEventListener('click', async (e) => {
     document.querySelectorAll('.gallery button').forEach((b) => b.classList.toggle('on', b === t)); return;
   }
   switch (d.act) {
-    case 'sheet': S.sheetOpen = !S.sheetOpen; renderSheet(); break;
+    case 'sheet': setSheet(S.sheet === 'open' ? 'mid' : 'open'); break;
+    case 'sheet-up': setSheet('mid'); break;
+    case 'sheet-min': setSheet('min'); break;
+    case 'near-close': selectPoint(null); break;
     case 'reload': cache.clear(); loadArea(); break;
     case 'capture-nearest':
       if (!S.nearest) { toast('No hay registros cercanos en este radio.'); break; }
-      if (!settings.demo && S.nearest.d > settings.capture) { toast(`El registro más cercano está a ${fmtDist(S.nearest.d)}. Acércate a ${settings.capture} m.`); break; }
-      startCapture(S.nearest.sp.id); break;
+      // Muestra en el mapa el registro más cercano; la captura se confirma desde su ficha.
+      selectPoint(S.points.find((p) => p.sp === S.nearest.sp && p.lat === S.nearest.lat && p.lng === S.nearest.lng) || null);
+      if (map) map.panTo([S.nearest.lat, S.nearest.lng]);
+      break;
     case 'dl-open': openDownload(); break;
     case 'dl-go': download().catch((err) => { console.error(err); toast('No se pudo generar el archivo.'); }); break;
     case 'modal-close': closeModal(); break;
