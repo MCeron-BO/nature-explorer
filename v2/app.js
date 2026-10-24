@@ -118,7 +118,9 @@ const thumb = (url, cls = '') => `<div class="thumb ${cls}" style="${url ? `back
 
 /* ---------- estado ---------- */
 // La v2 usa claves propias (nx2.*) para no mezclar datos con la v1 en el mismo dominio.
-const settings = Object.assign({ demo: true, lat: DEMO.lat, lng: DEMO.lng, label: DEMO.label, radius: 5, capture: 50, token: '', avatar: '🦊', sound: true }, ls.get('nx2.settings', {}));
+const settings = Object.assign({ demo: true, lat: DEMO.lat, lng: DEMO.lng, label: DEMO.label, radius: 5, capture: 50, token: '', avatar: '🧑', sound: true }, ls.get('nx2.settings', {}));
+// El zorro ya no existe como avatar: quien lo tenía guardado pasa a la persona.
+if (settings.avatar === '🦊') settings.avatar = '🧑';
 const S = {
   pos: { lat: settings.lat, lng: settings.lng },
   posLabel: settings.label,
@@ -146,7 +148,7 @@ const saveSettings = () => ls.set('nx2.settings', Object.assign(settings, { lat:
 const saveCollection = () => ls.set('nx2.collection', S.collection);
 
 /* ---------- juego: XP, niveles, rareza y logros ---------- */
-const AVATARS = ['🦊', '🐸', '🦉', '🐝', '🦎', '🐢', '🐼', '🐙', '🦋', '🐞'];
+const AVATARS = ['🧑', '🐸', '🦉', '🐝', '🦎', '🐢', '🐼', '🐙', '🦋', '🐞'];
 const LEVELS = ['Semilla', 'Brote', 'Retoño', 'Arbusto', 'Árbol', 'Bosque', 'Selva', 'Leyenda verde'];
 const game = Object.assign({ xp: 0, badges: [] }, ls.get('nx2.game', {}));
 const saveGame = () => ls.set('nx2.game', game);
