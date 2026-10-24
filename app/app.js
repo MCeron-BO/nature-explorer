@@ -47,6 +47,34 @@ async function getJSON(url, opts) {
   return p;
 }
 let toastT;
+// Sonido de captura sintetizado con Web Audio (sin archivos): un barrido ascendente y un arpegio brillante.
+let audioCtx;
+function playCaptureSound() {
+  if (settings.sound === false) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const t0 = audioCtx.currentTime;
+    const out = audioCtx.createGain();
+    out.gain.value = 0.35;
+    out.connect(audioCtx.destination);
+    const tone = (type, f0, f1, start, dur, vol) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(f0, t0 + start);
+      if (f1) o.frequency.exponentialRampToValueAtTime(f1, t0 + start + dur);
+      g.gain.setValueAtTime(0.0001, t0 + start);
+      g.gain.exponentialRampToValueAtTime(vol, t0 + start + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + start + dur);
+      o.connect(g).connect(out);
+      o.start(t0 + start); o.stop(t0 + start + dur + 0.05);
+    };
+    tone('sine', 220, 880, 0, 0.22, 0.5);
+    [1046.5, 1318.5, 1568, 2093].forEach((f, i) => tone('triangle', f, 0, 0.18 + i * 0.08, i === 3 ? 0.6 : 0.25, 0.6));
+    tone('sine', 4186, 0, 0.5, 0.4, 0.12);
+  } catch { /* sin audio en este navegador */ }
+  try { navigator.vibrate?.([40, 60, 80]); } catch { /* sin vibración */ }
+}
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2600); }
 const photoUrl = (p, size = 'medium') => (p ? (p[`${size}_url`] || p.url || '').replace('square', size) : '');
 const today = () => new Date().toISOString().slice(0, 10);
@@ -822,6 +850,7 @@ function openSettings() {
     <div class="field"><span style="font-weight:600">Ubicación</span>
       <div class="two"><button class="fmt ${settings.demo ? 'on' : ''}" data-act="use-demo"><b>Prueba</b><span class="muted" style="font-size:12px">${esc(DEMO.label)}</span></button><button class="fmt ${!settings.demo ? 'on' : ''}" data-act="use-gps"><b>GPS real</b><span class="muted" style="font-size:12px">Ubicación del dispositivo</span></button></div>
       <span class="muted" style="font-size:12px">También puedes mover el mapa y tocar el botón de alfiler para explorar cualquier lugar.</span></div>
+    <label class="mini" style="cursor:pointer"><input type="checkbox" id="snd" ${settings.sound !== false ? 'checked' : ''} style="width:22px;height:22px;accent-color:var(--g900)"><span class="info"><b style="font-size:15px">Sonido y vibración al capturar</b><span class="muted" style="font-size:13px">Se reproduce al tocar CAPTURAR</span></span></label>
     <div class="field"><label for="cap-m">Distancia máxima para capturar (GPS real)</label><select id="cap-m">${[20, 50, 100, 250].map((m) => `<option value="${m}" ${settings.capture === m ? 'selected' : ''}>${m} m</option>`).join('')}</select></div>
     <div class="field"><label for="tok">Token de API de iNaturalist (opcional)</label><input id="tok" type="password" autocomplete="off" value="${esc(settings.token)}" placeholder="Activa la identificación visual con IA">
       <span class="muted" style="font-size:12px;line-height:1.5">Obténlo con tu cuenta en <a href="https://www.inaturalist.org/users/api_token" target="_blank" rel="noopener">inaturalist.org/users/api_token</a>. Dura 24 h y solo se guarda en este navegador.</span></div>
@@ -859,6 +888,7 @@ document.addEventListener('click', async (e) => {
   if (d.capture) { startCapture(d.capture); return; }
   if (d.filter) { S.filter = d.filter; renderEspecies(); return; }
   if (d.fmt) { S.dlFmt = d.fmt; openDownload(); return; }
+  if (d.step === 'capturada') playCaptureSound();
   if (d.step) { S.capture.run = (S.capture.run || 0) + 1; S.capture.analyzing = false; S.capture.confirming = false; S.capture.step = d.step; renderCaptura(); return; }
   if (d.pick) { S.capture.pick = Number(d.pick); renderCaptura(); return; }
   if (d.nvPick) { S.nuevo.pick = Number(d.nvPick); renderNuevo(); return; }
@@ -895,7 +925,7 @@ document.addEventListener('click', async (e) => {
     case 'cap-retry': if (S.capture?.file) onCapturePhoto(S.capture.file); break;
     case 'use-demo': settings.demo = true; closeModal(); setPos(DEMO.lat, DEMO.lng, DEMO.label); break;
     case 'use-gps': closeModal(); locate(); break;
-    case 'settings-save': settings.token = $('#tok').value.trim(); settings.capture = Number($('#cap-m').value); saveSettings(); closeModal(); renderNear(); toast('Ajustes guardados'); break;
+    case 'settings-save': settings.token = $('#tok').value.trim(); settings.capture = Number($('#cap-m').value); settings.sound = $('#snd').checked; saveSettings(); closeModal(); renderNear(); toast('Ajustes guardados'); break;
   }
 });
 document.addEventListener('change', (e) => {
