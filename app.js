@@ -28,7 +28,21 @@ const fmtDist = (m) => (m == null ? '—' : m < 1000 ? `${Math.round(m)} m` : `$
 const cache = new Map();
 async function getJSON(url, opts) {
   if (!opts && cache.has(url)) return cache.get(url);
-  const p = fetch(url, opts).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); });
+  // Corta a los 20 s y reintenta dos veces si iNaturalist responde 429 (límite de solicitudes).
+  const p = (async () => {
+    for (let i = 0; ; i++) {
+      const ctl = new AbortController();
+      const tm = setTimeout(() => ctl.abort(), 20000);
+      try {
+        const r = await fetch(url, Object.assign({}, opts, { signal: ctl.signal }));
+        if (r.status === 429 && i < 2) { await new Promise((res) => setTimeout(res, 1500 * (i + 1))); continue; }
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return await r.json();
+      } catch (e) {
+        throw e.name === 'AbortError' ? new Error('timeout') : e;
+      } finally { clearTimeout(tm); }
+    }
+  })();
   if (!opts) { cache.set(url, p); p.catch(() => cache.delete(url)); }
   return p;
 }
@@ -597,14 +611,18 @@ function renderCaptura() {
       <div class="controls"><label class="cam-btn" aria-label="Elegir de la galería">${I.img}<input type="file" accept="image/*" class="sr" data-photo-input="capture"></label>
       <label class="shutter" aria-label="Tomar fotografía"><i></i><input type="file" accept="image/*" capture="environment" class="sr" data-photo-input="capture"></label><span style="width:48px"></span></div></div>`;
   } else if (c.step === 'ia') {
-    const body = c.analyzing ? '<div class="state"><div class="spinner"></div>Comparando con distribución, época, registros cercanos y catálogo…</div>' : `
+    const body = c.analyzing ? `<div class="state"><div class="spinner"></div>${esc(c.stage || 'Analizando…')}<button class="btn ghost" data-step="camara" style="width:auto">Cancelar y volver a la foto</button></div>`
+      : c.error ? `<div class="note" style="background:var(--orange50);color:var(--orange)">${esc(c.error)}</div>
+      <div style="margin-top:auto;display:flex;flex-direction:column;gap:8px"><button class="btn" data-act="cap-retry">Reintentar análisis</button><button class="btn light" data-step="camara">Tomar otra foto</button><a class="btn ghost" href="#coleccion">Guardar como pendiente y salir</a></div>` : `
       <div class="note" style="display:flex;flex-direction:column;gap:8px"><b style="color:var(--ink2)">Se comparó</b>${(c.criteria || []).map((x) => `<div class="crit"><span class="${x.ok ? 'ok' : 'no'}">${x.ok ? I.check : I.x}</span><span>${esc(x.label)}</span><span class="d">${esc(x.d)}</span></div>`).join('')}</div>
       <b style="font-size:15px">Posibles coincidencias</b>
       ${c.usedAI ? '' : `<div class="note" style="background:var(--amber50);color:var(--amber)">Sin token de iNaturalist no hay reconocimiento visual. Confirma tú la especie; puedes activar la IA en Ajustes del mapa.</div>`}
       ${(c.matches || []).map((m, i) => `<button class="match ${c.pick === i ? 'on' : ''}" data-pick="${i}"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px">${thumb(photoUrl(m.taxon.default_photo, 'square'), 'sm')}<div style="flex:1;display:flex;flex-direction:column;min-width:0"><span class="sci" style="font-size:16px">${esc(m.taxon.name)}</span><span class="muted" style="font-size:13px">${esc(cap(m.taxon.preferred_common_name))}${m.note ? ` · ${esc(m.note)}` : ''}</span></div>${m.pct != null ? `<b style="font-size:18px;color:var(--g900)">${m.pct} %</b>` : ''}</div>${m.pct != null ? `<div class="bar"><i style="width:${m.pct}%"></i></div>` : ''}</button>`).join('')}
-      <button class="btn" data-act="cap-confirm" style="margin-top:auto" ${c.matches?.length ? '' : 'disabled'}>Confirmar <i class="sci" style="font-weight:600">${esc(c.matches?.[c.pick]?.taxon.name || '')}</i></button>`;
+      <button class="btn" data-act="cap-confirm" style="margin-top:auto" ${c.matches?.length && !c.confirming ? '' : 'disabled'}>${c.confirming ? 'Validando con registros cercanos…' : `Confirmar <i class="sci" style="font-weight:600">${esc(c.matches?.[c.pick]?.taxon.name || '')}</i>`}</button>
+      <button class="btn ghost" data-step="camara">Tomar otra foto</button>`;
     el.innerHTML = `${progress('ia')}<div class="flow">
-      <div style="display:flex;gap:12px;align-items:center"><div class="thumb" style="width:84px;height:84px;border-radius:14px;background-image:url('${c.preview}')"></div><div style="display:flex;flex-direction:column;gap:3px"><span class="over" style="color:var(--g900)">Identificación</span><b style="font-size:20px">${c.analyzing ? 'Analizando…' : 'Análisis completado'}</b><span class="muted" style="font-size:13px">Tu foto · ${today()} · ${S.pos.lat.toFixed(4)}, ${S.pos.lng.toFixed(4)}</span></div></div>${body}</div>`;
+      <button class="btn ghost" data-step="camara" style="width:auto;align-self:flex-start;height:40px;padding:0 4px;margin:-8px 0 -6px">${I.back}Volver a la cámara</button>
+      <div style="display:flex;gap:12px;align-items:center"><div class="thumb" style="width:84px;height:84px;border-radius:14px;background-image:url('${c.preview}')"></div><div style="display:flex;flex-direction:column;gap:3px"><span class="over" style="color:var(--g900)">Identificación</span><b style="font-size:20px">${c.analyzing ? 'Analizando…' : c.error ? 'No se pudo analizar' : 'Análisis completado'}</b><span class="muted" style="font-size:13px">Tu foto · ${today()} · ${S.pos.lat.toFixed(4)}, ${S.pos.lng.toFixed(4)}</span></div></div>${body}</div>`;
   } else if (c.step === 'resultado') {
     const r = RES[c.result.status];
     const chosen = c.matches[c.pick].taxon;
@@ -619,28 +637,60 @@ function renderCaptura() {
 }
 async function onCapturePhoto(file) {
   const c = S.capture;
-  c.preview = await shrink(file);
-  c.step = 'ia'; c.analyzing = true; c.pick = 0; renderCaptura();
-  let matches = null;
-  try { matches = await computerVision(file, S.pos.lat, S.pos.lng); } catch (e) { toast('La IA de iNaturalist no respondió (¿token vencido?).'); }
-  c.usedAI = !!matches;
-  const capT = (await getJSON(`${INAT}/taxa/${c.sp.inatId}?locale=es`)).results[0];
-  if (!matches) {
-    const alt = S.species.filter((s) => s !== c.sp && s.inatId && s.family && s.family === c.sp.family).slice(0, 2);
-    matches = [{ taxon: capT, pct: null, note: 'especie capturada' }, ...alt.map((s) => ({ taxon: { id: s.inatId, name: s.sci, preferred_common_name: s.common, default_photo: { square_url: s.photo } }, pct: null, note: `misma familia · ${fmtDist(s.dist)}` }))];
+  const run = (c.run = (c.run || 0) + 1);
+  const alive = () => S.capture === c && c.run === run;
+  const stage = (txt) => { c.stage = txt; if (alive() && route().name === 'captura') renderCaptura(); };
+  c.file = file; c.error = null; c.matches = null; c.criteria = null; c.pick = 0;
+  c.step = 'ia'; c.analyzing = true;
+  stage('Preparando la foto…');
+  try { c.preview = await shrink(file); } catch { c.preview = ''; }
+  try {
+    stage('Buscando la especie en el catálogo de iNaturalist…');
+    const capT = c.sp.inatId ? (await getJSON(`${INAT}/taxa/${c.sp.inatId}?locale=es`)).results[0] : await resolveTaxon(c.sp);
+    if (!capT) throw new Error('Esta especie no está en el catálogo de iNaturalist, así que no se puede validar con foto.');
+    if (!alive()) return;
+    let matches = null;
+    if (settings.token) {
+      stage('Reconociendo la planta en tu foto…');
+      try { matches = await computerVision(file, S.pos.lat, S.pos.lng); } catch { toast('La IA de iNaturalist no respondió (¿token vencido?). Confirma la especie tú.'); }
+      if (!alive()) return;
+    }
+    c.usedAI = !!matches?.length;
+    if (!c.usedAI) {
+      const alt = S.species.filter((s) => s !== c.sp && s.inatId && s.family && s.family === c.sp.family).slice(0, 2);
+      matches = [{ taxon: capT, pct: null, note: 'especie capturada' }, ...alt.map((s) => ({ taxon: { id: s.inatId, name: s.sci, preferred_common_name: s.common, default_photo: { square_url: s.photo } }, pct: null, note: `misma familia · ${fmtDist(s.dist)}` }))];
+    }
+    const idx = matches.findIndex((m) => m.taxon.id === capT.id);
+    c.pick = idx >= 0 ? idx : 0;
+    c.matches = matches;
+    stage('Comparando distribución, época del año y registros cercanos…');
+    c.criteria = await criteriaFor(capT, true, c.usedAI);
+  } catch (e) {
+    console.error(e);
+    if (!alive()) return;
+    c.error = /timeout|fetch|network|HTTP/i.test(e.message)
+      ? 'No se pudo contactar a iNaturalist o GBIF. Revisa tu conexión y vuelve a intentarlo.'
+      : e.message;
   }
-  const idx = matches.findIndex((m) => m.taxon.id === c.sp.inatId);
-  c.pick = idx >= 0 ? idx : 0;
-  c.matches = matches;
-  c.criteria = await criteriaFor(capT, true, c.usedAI);
+  if (!alive()) return;
   c.analyzing = false;
   if (route().name === 'captura') renderCaptura();
 }
 async function confirmCapture() {
   const c = S.capture;
+  if (c.confirming) return;
   const t = c.matches[c.pick].taxon;
-  toast('Validando con registros cercanos…');
-  c.result = await classify(t);
+  c.confirming = true; renderCaptura();
+  try {
+    c.result = await classify(t);
+  } catch (e) {
+    console.error(e);
+    c.confirming = false; renderCaptura();
+    toast('No se pudo validar. Revisa tu conexión y vuelve a intentarlo.');
+    return;
+  }
+  c.confirming = false;
+  if (S.capture !== c) return;
   addToCollection({ uid: c.uid, id: String(t.id), taxonId: t.id, sci: t.name, common: cap(t.preferred_common_name), photo: photoUrl(t.default_photo, 'square') || c.sp.photo, userPhoto: c.preview, status: c.result.status, conf: c.matches[c.pick].pct, date: today(), lat: S.pos.lat, lng: S.pos.lng, kind: 'captura' });
   c.step = 'resultado'; renderCaptura();
 }
@@ -650,7 +700,10 @@ function renderNuevo() {
   const el = $('#s-nuevo');
   const n = S.nuevo || (S.nuevo = { step: 1, pick: 0, q: '', results: [], publish: true, notes: '', uid: `n${Date.now()}` });
   const labels = ['Foto', 'Ubicación', 'Identificación', 'Guardar'];
-  const head = `<header class="head"><div style="display:flex;align-items:center;gap:8px"><a href="#mapa" class="x" style="margin-left:-12px;margin-right:0" aria-label="Volver al mapa">${I.back}</a><div><b style="font-size:19px">Nuevo registro</b><div class="muted" style="font-size:13px">Ciencia ciudadana · especie descubierta por ti</div></div></div>
+  const back = n.step > 1 && n.step < 5
+    ? `<button class="x" data-act="nv-back" style="margin-left:-12px;margin-right:0" aria-label="Paso anterior">${I.back}</button>`
+    : `<a href="#mapa" class="x" style="margin-left:-12px;margin-right:0" aria-label="Volver al mapa">${I.back}</a>`;
+  const head = `<header class="head"><div style="display:flex;align-items:center;gap:8px">${back}<div><b style="font-size:19px">Nuevo registro</b><div class="muted" style="font-size:13px">Ciencia ciudadana · especie descubierta por ti</div></div></div>
     <div class="stepper">${labels.map((l, i) => `<div class="${i + 1 <= Math.min(n.step, 4) ? 'on' : ''} ${i + 1 === Math.min(n.step, 4) ? 'cur' : ''}"><i></i>${l}</div>`).join('')}</div></header>`;
   let body = '';
   if (n.step === 1) {
@@ -806,7 +859,7 @@ document.addEventListener('click', async (e) => {
   if (d.capture) { startCapture(d.capture); return; }
   if (d.filter) { S.filter = d.filter; renderEspecies(); return; }
   if (d.fmt) { S.dlFmt = d.fmt; openDownload(); return; }
-  if (d.step) { S.capture.step = d.step; renderCaptura(); return; }
+  if (d.step) { S.capture.run = (S.capture.run || 0) + 1; S.capture.analyzing = false; S.capture.confirming = false; S.capture.step = d.step; renderCaptura(); return; }
   if (d.pick) { S.capture.pick = Number(d.pick); renderCaptura(); return; }
   if (d.nvPick) { S.nuevo.pick = Number(d.nvPick); renderNuevo(); return; }
   if (d.cat) { const tx = S.nuevo.catalog[Number(d.cat)]; S.nuevo.matches = [{ taxon: tx, pct: null, note: 'catálogo' }, ...S.nuevo.matches.filter((m) => m.taxon.id !== tx.id)]; S.nuevo.pick = 0; renderNuevo(); return; }
@@ -838,6 +891,8 @@ document.addEventListener('click', async (e) => {
     case 'nv-use': nuevoUse(); break;
     case 'nv-save': nuevoSave(); break;
     case 'nv-reset': S.nuevo = null; renderNuevo(); break;
+    case 'nv-back': S.nuevo.step = Math.max(1, S.nuevo.step - 1); S.nuevo.analyzing = false; S.nuevo.locating = false; renderNuevo(); break;
+    case 'cap-retry': if (S.capture?.file) onCapturePhoto(S.capture.file); break;
     case 'use-demo': settings.demo = true; closeModal(); setPos(DEMO.lat, DEMO.lng, DEMO.label); break;
     case 'use-gps': closeModal(); locate(); break;
     case 'settings-save': settings.token = $('#tok').value.trim(); settings.capture = Number($('#cap-m').value); saveSettings(); closeModal(); renderNear(); toast('Ajustes guardados'); break;
