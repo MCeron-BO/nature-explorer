@@ -148,7 +148,7 @@ const saveSettings = () => ls.set('nx2.settings', Object.assign(settings, { lat:
 const saveCollection = () => ls.set('nx2.collection', S.collection);
 
 /* ---------- juego: XP, niveles, rareza y logros ---------- */
-const AVATARS = ['🧑', '🐸', '🦉', '🐝', '🦎', '🐢', '🐼', '🐙', '🦋', '🐞'];
+const AVATARS = ['🧑', '👩', '👨', '🐸', '🦉', '🐝', '🦎', '🐢', '🐼', '🐙', '🦋', '🐞'];
 const LEVELS = ['Semilla', 'Brote', 'Retoño', 'Arbusto', 'Árbol', 'Bosque', 'Selva', 'Leyenda verde'];
 const game = Object.assign({ xp: 0, badges: [] }, ls.get('nx2.game', {}));
 const saveGame = () => ls.set('nx2.game', game);
