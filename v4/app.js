@@ -489,9 +489,14 @@ function fitRadius(animate) {
 }
 // Cambia el radio 1 km: el círculo y el encuadre se actualizan al instante; los datos, al dejar de tocar.
 let radiusT;
-function changeRadius(delta) {
-  const next = Math.min(KM_MAX, Math.max(KM_MIN, S.radius + delta));
-  if (next === S.radius) return;
+function changeRadius(delta) { setRadius(S.radius + delta); }
+// Fija el radio en km (con − y + o escribiéndolo); se ajusta a 1–50 y a número entero.
+function setRadius(km) {
+  const v = Number(km);
+  const base = String(km).trim() !== '' && Number.isFinite(v) ? Math.round(v) : S.radius;
+  const next = Math.min(KM_MAX, Math.max(KM_MIN, base));
+  $('#radii').value = next;
+  if (next === S.radius) { renderRadii(); return; }
   S.radius = next;
   saveSettings();
   renderRadii();
@@ -549,7 +554,7 @@ function renderPoints() {
   if (S.selected && !S.points.includes(S.selected)) selectPoint(null);
 }
 function renderRadii() {
-  $('#radii').textContent = `${S.radius} km`;
+  if (document.activeElement !== $('#radii')) $('#radii').value = S.radius;
   $('#km-dec').disabled = S.radius <= KM_MIN;
   $('#km-inc').disabled = S.radius >= KM_MAX;
   const ll = $('#loc-label');
@@ -1789,6 +1794,10 @@ function locate() {
 $('#btn-locate').addEventListener('click', locate);
 $('#btn-ajustes').addEventListener('click', openSettings);
 $('#btn-layers').addEventListener('click', toggleLayer);
+// Radio escrito a mano: se aplica al confirmar (Enter o salir del campo).
+$('#radii').addEventListener('change', (e) => setRadius(e.target.value));
+$('#radii').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') { e.target.value = S.radius; e.target.blur(); } });
+$('#radii').addEventListener('focus', (e) => e.target.select());
 $('#radar').addEventListener('click', () => { const p = S.radarTarget; if (p) { selectPoint(p); if (map) map.panTo([p.lat, p.lng]); } });
 $('#btn-here').addEventListener('click', () => {
   const c = map.getCenter();

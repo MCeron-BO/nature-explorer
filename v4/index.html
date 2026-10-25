@@ -23,7 +23,7 @@
         <div class="map-title"><span class="logo-leaf sm" aria-hidden="true"></span><div><b>Nature Explorer</b><span id="loc-label">Flora</span></div></div>
         <div class="km-step" role="group" aria-label="Radio de búsqueda">
           <button data-act="km-dec" id="km-dec" aria-label="Disminuir el radio 1 kilómetro"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button>
-          <output id="radii" aria-live="polite">5 km</output>
+          <label class="km-in"><input id="radii" type="number" inputmode="numeric" min="1" max="50" step="1" value="5" aria-label="Radio de búsqueda en kilómetros (1 a 50)" enterkeyhint="done"><span aria-hidden="true">km</span></label>
           <button data-act="km-inc" id="km-inc" aria-label="Aumentar el radio 1 kilómetro"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button>
         </div>
         <button class="icon-btn" id="btn-ajustes" aria-label="Ajustes" data-keep="1"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>

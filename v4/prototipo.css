@@ -393,3 +393,10 @@ body.is-offline .map-title span:not(.logo-leaf){color:#B23A2E;font-weight:800}
 .zone-card .two{margin-top:6px}
 .zone-job:empty{display:none}
 .zone-job{display:flex;flex-direction:column;gap:6px;background:var(--g50);border-radius:14px;padding:12px;font-size:13px}
+
+/* v4.6: radio escrito a mano */
+.km-in{display:flex;align-items:baseline;gap:2px;cursor:text}
+.km-in input{width:30px;border:none;background:transparent;text-align:right;font:800 13px var(--display);color:var(--ink);padding:0;-moz-appearance:textfield;font-variant-numeric:tabular-nums}
+.km-in input::-webkit-outer-spin-button,.km-in input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.km-in input:focus{outline:2px solid var(--g700);outline-offset:2px;border-radius:4px;background:#fff}
+.km-in span{font:800 12px var(--display);color:var(--ink2);padding-right:4px}
