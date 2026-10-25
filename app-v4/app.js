@@ -5,6 +5,8 @@ const INAT = 'https://api.inaturalist.org/v1';
 const GBIF = 'https://api.gbif.org/v1';
 const PLANTAE = 47126;
 const RADII = [1, 5, 10, 25, 50];
+// v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
+const KM_MIN = 1, KM_MAX = 50;
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -142,7 +144,7 @@ const S = {
   nearest: null,
   filter: 'todas',
   q: '',
-  sheet: ['min', 'mid', 'open'].includes(settings.sheet) ? settings.sheet : 'mid',
+  sheet: ['min', 'mid', 'open'].includes(settings.sheet) ? settings.sheet : 'min',
   selected: null,
   dlFmt: 'csv',
   capture: null,
@@ -363,7 +365,8 @@ function openMore() {
 function initMap() {
   if (map) return;
   // Sin franja de atribución: los créditos de las imágenes (exigidos por Esri) están en «Más › Créditos del mapa».
-  map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([S.pos.lat, S.pos.lng], 14);
+  // zoomSnap fino para que el círculo de cada kilómetro encaje ajustado en pantalla.
+  map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true, zoomSnap: 0.25, zoomDelta: 0.5 }).setView([S.pos.lat, S.pos.lng], 14);
   baseLayers = {
     sat: L.layerGroup([
       L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }),
@@ -470,11 +473,31 @@ function selectPoint(p) {
   if (p && map) {
     selRing = L.circleMarker([p.lat, p.lng], { radius: 24, weight: 4, color: '#B8F24A', dashArray: '6 5', fill: false, interactive: false }).addTo(map);
     sfx('pop');
-    if (S.sheet === 'open') { S.sheet = 'mid'; renderSheet(); }
+    // Al elegir una planta, el panel se recoge para dejar el mapa despejado.
+    if (S.sheet !== 'min') { S.sheet = 'min'; renderSheet(); }
   }
   renderNear();
 }
-function fitRadius() { if (map && circle) map.fitBounds(circle.getBounds(), { paddingTopLeft: [10, 180], paddingBottomRight: [70, 220] }); }
+// Encaja el círculo del radio en el espacio libre entre la cabecera y el panel inferior.
+function fitRadius(animate) {
+  if (!map || !circle) return;
+  const top = ($('.map-head')?.offsetHeight || 60) + 10;
+  const bottom = ($('#sheet')?.offsetHeight || 60) + 16;
+  map.fitBounds(circle.getBounds(), { paddingTopLeft: [12, top], paddingBottomRight: [60, bottom], animate: !!animate });
+}
+// Cambia el radio 1 km: el círculo y el encuadre se actualizan al instante; los datos, al dejar de tocar.
+let radiusT;
+function changeRadius(delta) {
+  const next = Math.min(KM_MAX, Math.max(KM_MIN, S.radius + delta));
+  if (next === S.radius) return;
+  S.radius = next;
+  saveSettings();
+  renderRadii();
+  sfx('pop');
+  if (circle) { circle.setRadius(S.radius * 1000); fitRadius(true); }
+  clearTimeout(radiusT);
+  radiusT = setTimeout(loadArea, 650);
+}
 function setPos(lat, lng, label) {
   S.pos = { lat, lng }; S.posLabel = label;
   saveSettings();
@@ -524,8 +547,12 @@ function renderPoints() {
   if (S.selected && !S.points.includes(S.selected)) selectPoint(null);
 }
 function renderRadii() {
-  $('#radii').innerHTML = RADII.map((k) => `<button class="${k === S.radius ? 'on' : ''}" data-r="${k}" aria-pressed="${k === S.radius}">${k} km</button>`).join('');
-  $('#loc-label').textContent = `${settings.demo ? 'Ubicación de prueba' : 'Mi ubicación'} · ${S.posLabel}`;
+  $('#radii').textContent = `${S.radius} km`;
+  $('#km-dec').disabled = S.radius <= KM_MIN;
+  $('#km-inc').disabled = S.radius >= KM_MAX;
+  const ll = $('#loc-label');
+  ll.textContent = `Flora · ${settings.demo ? 'ubicación de prueba' : 'mi ubicación'}`;
+  ll.title = S.posLabel;
 }
 function renderNear() {
   const el = $('#near-card');
@@ -546,11 +573,34 @@ function renderNear() {
   requestAnimationFrame(placeFloating);
 }
 function setSheet(state) {
+  if (S.sheet === state) return;
   S.sheet = state;
   settings.sheet = state;
   saveSettings();
   renderSheet();
+  sfx('pop');
 }
+// Bottom sheet: se desliza hacia arriba para ver más (resumen → lista) y hacia abajo para recogerlo.
+(function sheetGestures() {
+  const sh = $('#sheet');
+  const ORDER = ['min', 'mid', 'open'];
+  let y0 = null;
+  sh.addEventListener('pointerdown', (e) => {
+    // En la lista abierta se puede desplazar normalmente; el gesto se toma solo desde la cabecera.
+    if (S.sheet === 'open' && !e.target.closest('.sheet-head,.grab')) return;
+    y0 = e.clientY;
+  });
+  window.addEventListener('pointerup', (e) => {
+    if (y0 == null) return;
+    const dy = e.clientY - y0;
+    y0 = null;
+    if (Math.abs(dy) < 28) return;
+    const i = ORDER.indexOf(S.sheet);
+    S.sheetDragAt = Date.now();
+    setSheet(ORDER[dy < 0 ? Math.min(2, i + 1) : Math.max(0, i - 1)]);
+  });
+  window.addEventListener('pointercancel', () => { y0 = null; });
+})();
 function renderSheet() {
   const sh = $('#sheet');
   const c = S.counts;
@@ -560,7 +610,7 @@ function renderSheet() {
   sh.classList.toggle('min', min);
   const title = S.loading ? 'Buscando especies…' : S.error ? 'No se pudieron cargar las especies' : `${nf(c.total)} especies de plantas`;
   const sub = S.loading ? 'Consultando GBIF e iNaturalist' : S.error ? 'Revisa tu conexión' : `en un radio de ${S.radius} km`;
-  const head = `<button class="sheet-head" data-act="${min ? 'sheet-up' : open ? 'sheet' : 'sheet-min'}" aria-label="${min ? 'Mostrar resumen' : open ? 'Contraer lista' : 'Minimizar panel'}">
+  const head = `<span class="grab" aria-hidden="true"></span><button class="sheet-head${min ? ' compact' : ''}" data-act="${min ? 'sheet-up' : open ? 'sheet' : 'sheet-min'}" aria-label="${min ? 'Mostrar resumen' : open ? 'Contraer lista' : 'Minimizar panel'}">
       <span class="logo-leaf sm" aria-hidden="true"></span><span class="t"><b>${title}</b><span>${sub}</span></span><span class="chev">${min ? I.up : I.down}</span></button>`;
   if (min) { sh.innerHTML = head; renderNear(); return; }
   let body;
@@ -1301,6 +1351,9 @@ document.addEventListener('click', async (e) => {
   if (!t) { if (e.target.id === 'modal') closeModal(); return; }
   const d = t.dataset;
   if (d.avatar) { settings.avatar = d.avatar; saveSettings(); refreshAvatar(); renderHud(); sfx('pop'); openProfile(); if (route().name === 'inicio') renderInicio(); return; }
+  if (d.act === 'km-dec' || d.act === 'km-inc') { changeRadius(d.act === 'km-inc' ? 1 : -1); return; }
+  // Un deslizamiento del panel también dispara un clic al soltar: se ignora para no cambiarlo dos veces.
+  if (/^sheet/.test(d.act || '') && Date.now() - (S.sheetDragAt || 0) < 400) return;
   if (d.r) { S.radius = Number(d.r); saveSettings(); renderRadii(); if (circle) { circle.setRadius(S.radius * 1000); fitRadius(); } loadArea(); return; }
   if (d.capture) {
     // Regla del juego: solo se captura lo que tienes cerca. Si está lejos, te lleva a la planta en el mapa.
