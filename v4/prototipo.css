@@ -327,3 +327,40 @@ a.kcard{border-color:#BFE2C9;background:linear-gradient(90deg,#fff,#F1FAF3)}
 .near .cap{height:32px;font-size:12px;padding:0 12px}
 .near .rar{font-size:10.5px;padding:2px 8px}
 #map .leaflet-control-scale-line{font-size:9px}
+
+/* ===== Ajustes v4.2: buscador sobre el mapa y barra inferior configurable ===== */
+.map-head{gap:6px}
+.map-search{display:flex;align-items:center;gap:8px;height:40px;border-radius:12px;background:#fff;border:1px solid var(--line2);padding:0 6px 0 12px;color:var(--muted);box-shadow:0 1px 4px rgba(18,38,26,.06)}
+.map-search svg{width:18px;height:18px}
+.map-search input{flex:1;min-width:0;border:none;outline:none;background:transparent;font-size:14px;color:var(--ink)}
+.map-search input::placeholder{color:var(--muted)}
+.map-search .chip{font-size:11.5px;padding:3px 10px}
+.map-search:focus-within{border-color:var(--g900);box-shadow:0 0 0 3px rgba(27,107,58,.15)}
+.mq-res{background:#fff;border-radius:12px;border:1px solid var(--line);box-shadow:0 10px 24px rgba(18,38,26,.18);overflow:hidden;max-height:320px;overflow-y:auto}
+.mq-res[hidden]{display:none}
+.mq-res button{display:flex;align-items:center;gap:10px;width:100%;border:none;border-bottom:1px solid var(--line);background:#fff;padding:6px 10px;text-align:left;color:var(--ink)}
+.mq-res button:last-child{border-bottom:none}
+.mq-res button:hover{background:var(--g50)}
+.mq-res .info{flex:1;min-width:0;display:flex;flex-direction:column}
+.mq-res .info b{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mq-res .info .sci{font-size:12px;color:var(--ink2)}
+.mq-res .d{font-size:12px;font-weight:700;color:var(--muted)}
+.mq-res .mq-all{justify-content:center;color:var(--g900);font-weight:700;font-size:12.5px;height:38px}
+.mq-res .mq-all svg{width:14px;height:14px}
+.mq-empty{padding:12px;font-size:12.5px;color:var(--muted)}
+.map-side{top:110px}
+/* Barra inferior: opciones ocultables */
+#tabbar [hidden]{display:none!important}
+#tabbar [data-tab="ocultar"]{color:var(--muted)}
+#phone.tabs-off #tabbar{display:none}
+#phone.tabs-off .screen{bottom:0}
+.tabs-show{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);z-index:950;height:26px;padding:0 12px 0 8px;border:none;border-radius:999px;background:rgba(18,38,26,.82);color:#fff;font:700 11px var(--display);display:flex;align-items:center;gap:4px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.tabs-show[hidden]{display:none}
+.tabs-show svg{width:14px;height:14px;stroke-width:2.6}
+#phone.tabs-off .sheet{padding-bottom:34px}
+#phone.tabs-off .sheet.min{padding-bottom:30px}
+.menu label{display:flex;align-items:center;gap:12px;height:50px;padding:0 14px;border-bottom:1px solid var(--line);font-weight:600;font-size:14px}
+.menu label:last-child{border-bottom:none}
+.menu label span{flex:1}
+#phone.tabs-off .dlbar{padding-bottom:40px}
+#phone.tabs-off .flow,#phone.tabs-off .scrollarea,#phone.tabs-off .screen.scroll{padding-bottom:44px}

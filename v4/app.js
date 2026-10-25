@@ -129,7 +129,9 @@ const thumb = (url, cls = '') => `<div class="thumb ${cls}" style="${url ? `back
 
 /* ---------- estado ---------- */
 // La v4 usa claves propias (nx4.*) para no mezclar datos con las otras versiones en el mismo dominio.
-const settings = Object.assign({ demo: true, lat: DEMO.lat, lng: DEMO.lng, label: DEMO.label, radius: 5, capture: 50, token: '', avatar: '🧑', sound: true }, ls.get('nx4.settings', {}));
+const settings = Object.assign({ demo: true, lat: DEMO.lat, lng: DEMO.lng, label: DEMO.label, radius: 5, capture: 50, token: '', avatar: '🧑', sound: true, tabsHidden: false }, ls.get('nx4.settings', {}));
+// Qué opciones muestra la barra inferior; «Más» siempre queda, porque desde ahí se vuelven a activar.
+settings.tabs = Object.assign({ mapa: true, especies: true, nuevo: true, coleccion: true }, settings.tabs);
 // El zorro ya no existe como avatar: quien lo tenía guardado pasa a la persona.
 if (settings.avatar === '🦊') settings.avatar = '🧑';
 const S = {
@@ -359,6 +361,7 @@ function openMore() {
       <button data-act="profile">${I.star}<span>Perfil, avatar y logros</span>${I.right}</button>
       <button data-act="open-settings">${I.filter}<span>Ajustes: ubicación, sonido e IA</span>${I.right}</button>
       <button data-act="credits">${I.book}<span>Créditos del mapa y los datos</span>${I.right}</button>
+      <button data-act="tabs-config">${I.filter}<span>Personalizar la barra inferior</span>${I.right}</button>
       <a href="#inicio">${I.leaf}<span>Volver a elegir reino</span>${I.right}</a>
     </div>`);
 }
@@ -385,7 +388,7 @@ function initMap() {
   userMarker.on('dragend', () => { const ll = userMarker.getLatLng(); movePlayer(ll.lat, ll.lng, true); });
   map.on('movestart', () => $('#crosshair').classList.add('on'));
   map.on('moveend', () => setTimeout(() => $('#crosshair').classList.remove('on'), 900));
-  map.on('click', () => selectPoint(null));
+  map.on('click', () => { selectPoint(null); hideMapSearch(); });
   fitRadius();
   renderPoints();
 }
@@ -1329,12 +1332,73 @@ function closeModal() { $('#modal').hidden = true; $('#modal').innerHTML = ''; }
 
 /* ---------- router ---------- */
 function route() { const [name, arg] = location.hash.slice(1).split('/'); return { name: name || 'inicio', arg: arg && decodeURIComponent(arg) }; }
+/* ---------- barra inferior configurable ---------- */
+const TAB_NAMES = { mapa: 'Mapa', especies: 'Especies', nuevo: 'Registrar', coleccion: 'Colección' };
+function applyTabs() {
+  let n = 0;
+  document.querySelectorAll('#tabbar [data-tab]').forEach((el) => {
+    const k = el.dataset.tab;
+    const on = !(k in TAB_NAMES) || settings.tabs[k] !== false;
+    el.hidden = !on;
+    if (on) n++;
+  });
+  $('#tabbar').style.gridTemplateColumns = `repeat(${n}, minmax(0, 1fr))`;
+  $('#phone').classList.toggle('tabs-off', !!settings.tabsHidden);
+  const full = ['inicio', 'captura'].includes(route().name);
+  $('#tabs-show').hidden = full || !settings.tabsHidden;
+  if (map) setTimeout(() => { map.invalidateSize(); placeFloating(); }, 60);
+}
+function setTabsHidden(hidden) {
+  settings.tabsHidden = hidden;
+  saveSettings();
+  applyTabs();
+  sfx('pop');
+  if (hidden) toast('Barra oculta. Toca «Menú» abajo para mostrarla.');
+}
+function openTabsConfig() {
+  openModal(`<div class="top"><h2>Barra inferior</h2><button class="x" data-act="modal-close" aria-label="Cerrar">${I.x}</button></div>
+    <p class="muted" style="margin:0;font-size:13px">Elige qué opciones quieres ver. «Más» siempre aparece para que puedas volver a cambiarlo.</p>
+    <div class="menu">${Object.entries(TAB_NAMES).map(([k, l]) => `<label style="cursor:pointer"><span>${l}</span><input type="checkbox" data-tabopt="${k}" ${settings.tabs[k] !== false ? 'checked' : ''} style="width:22px;height:22px;accent-color:var(--g900)"></label>`).join('')}
+      <label style="cursor:pointer"><span>Ocultar toda la barra</span><input type="checkbox" data-tabopt="__all" ${settings.tabsHidden ? 'checked' : ''} style="width:22px;height:22px;accent-color:var(--g900)"></label></div>`);
+}
+/* ---------- buscador de especies sobre el mapa ---------- */
+function hideMapSearch() { const r = $('#mq-res'); if (r) { r.hidden = true; r.innerHTML = ''; } }
+function mapSearch() {
+  const q = $('#mq').value.trim().toLowerCase();
+  const box = $('#mq-res');
+  if (q.length < 2) { hideMapSearch(); return; }
+  const score = (s) => { const c = (s.common || '').toLowerCase(), n = s.sci.toLowerCase(); return c.startsWith(q) || n.startsWith(q) ? 0 : c.includes(q) || n.includes(q) ? 1 : 9; };
+  const hits = S.species.map((s) => ({ s, k: score(s) })).filter((x) => x.k < 9).sort((a, b) => a.k - b.k || (a.s.dist ?? 1e12) - (b.s.dist ?? 1e12)).slice(0, 6);
+  box.hidden = false;
+  box.innerHTML = S.loading ? '<div class="mq-empty">Buscando especies…</div>'
+    : hits.length ? hits.map(({ s }) => `<button data-mq="${esc(s.id)}">${thumb(s.photo, 'sm')}<span class="info"><b>${esc(s.common || s.sci)}</b><span class="sci">${esc(s.sci)}</span></span><span class="d">${fmtDist(s.dist)}</span></button>`).join('')
+      + `<button class="mq-all" data-act="mq-all">Ver todos los resultados en Especies ${I.right}</button>`
+      : `<div class="mq-empty">No hay «${esc($('#mq').value.trim())}» en ${S.radius} km. Prueba con un radio mayor.</div>`;
+}
+// Elegir un resultado lleva el mapa al registro más cercano de esa especie y abre su ficha de captura.
+function goToSpecies(id) {
+  const sp = findSp(id);
+  hideMapSearch();
+  $('#mq').blur();
+  const near = S.points.filter((p) => p.sp === sp).sort((a, b) => dist(S.pos, a) - dist(S.pos, b))[0];
+  if (!near) { location.hash = `#ficha/${id}`; return; }
+  map.flyTo([near.lat, near.lng], Math.max(map.getZoom(), 15), { duration: 0.8 });
+  setTimeout(() => selectPoint(near), 850);
+}
+$('#mq').addEventListener('input', mapSearch);
+$('#mq').addEventListener('focus', mapSearch);
+$('#mq').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { const first = $('#mq-res [data-mq]'); if (first) goToSpecies(first.dataset.mq); }
+  if (e.key === 'Escape') { hideMapSearch(); e.target.blur(); }
+});
 function show() {
   const { name, arg } = route();
   document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.dataset.screen === name));
   const full = ['inicio', 'captura'].includes(name);
   $('#tabbar').classList.toggle('hidden', full);
+  $('#tabs-show').hidden = full || !settings.tabsHidden;
   document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('full', full));
+  if (name !== 'mapa') hideMapSearch();
   document.querySelectorAll('#tabbar a').forEach((a) => a.classList.toggle('on', a.dataset.tab === name));
   if (name === 'inicio') renderInicio();
   if (name === 'mapa') { initMap(); setTimeout(() => map.invalidateSize(), 50); renderRadii(); renderSheet(); }
@@ -1351,6 +1415,7 @@ document.addEventListener('click', async (e) => {
   if (!t) { if (e.target.id === 'modal') closeModal(); return; }
   const d = t.dataset;
   if (d.avatar) { settings.avatar = d.avatar; saveSettings(); refreshAvatar(); renderHud(); sfx('pop'); openProfile(); if (route().name === 'inicio') renderInicio(); return; }
+  if (d.mq) { goToSpecies(d.mq); return; }
   if (d.act === 'km-dec' || d.act === 'km-inc') { changeRadius(d.act === 'km-inc' ? 1 : -1); return; }
   // Un deslizamiento del panel también dispara un clic al soltar: se ignora para no cambiarlo dos veces.
   if (/^sheet/.test(d.act || '') && Date.now() - (S.sheetDragAt || 0) < 400) return;
@@ -1405,6 +1470,10 @@ document.addEventListener('click', async (e) => {
     }
     case 'profile': openProfile(); break;
     case 'more': openMore(); break;
+    case 'tabs-hide': setTabsHidden(true); break;
+    case 'tabs-show': setTabsHidden(false); break;
+    case 'tabs-config': openTabsConfig(); break;
+    case 'mq-all': S.q = $('#mq').value; hideMapSearch(); location.hash = '#especies'; setTimeout(() => { const q = $('#q'); if (q) q.value = S.q; renderEspecies(); }, 60); break;
     case 'open-settings': openSettings(); break;
     case 'credits': closeModal(); toast('Imágenes © Esri, Maxar, Earthstar Geographics · Mapa con Leaflet · Datos: GBIF, iNaturalist'); break;
     case 'focus-q': $('#q')?.focus(); break;
@@ -1434,6 +1503,12 @@ document.addEventListener('click', async (e) => {
   }
 });
 document.addEventListener('change', (e) => {
+  const opt = e.target.dataset?.tabopt;
+  if (opt) {
+    if (opt === '__all') setTabsHidden(e.target.checked);
+    else { settings.tabs[opt] = e.target.checked; saveSettings(); applyTabs(); }
+    return;
+  }
   const f = e.target.files?.[0];
   if (!f) return;
   if (e.target.dataset.photoInput === 'capture') onCapturePhoto(f);
@@ -1471,5 +1546,6 @@ $('#btn-here').addEventListener('click', () => {
 window.addEventListener('hashchange', show);
 
 renderHud();
+applyTabs();
 show();
 loadArea();
