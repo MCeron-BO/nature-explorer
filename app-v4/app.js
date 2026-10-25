@@ -695,11 +695,29 @@ function openProfile() {
 }
 
 /* ---------- especies ---------- */
+// Orden de todas las búsquedas por especie (buscador del mapa y listado): A–Z o por cercanía.
+const spLabel = (s) => s.common || s.sci;
+const byName = (a, b) => spLabel(a).localeCompare(spLabel(b), 'es', { sensitivity: 'base' });
+const byDist = (a, b) => (a.dist ?? Infinity) - (b.dist ?? Infinity) || byName(a, b);
+const sortSpecies = (list) => list.sort(settings.sort === 'dist' ? byDist : byName);
+const sortToggle = (extra = '') => `<div class="sort-tg ${extra}" role="group" aria-label="Ordenar especies">
+    <span>Ordenar</span>
+    <button data-act="sort-az" class="${settings.sort !== 'dist' ? 'on' : ''}" aria-pressed="${settings.sort !== 'dist'}">A–Z</button>
+    <button data-act="sort-dist" class="${settings.sort === 'dist' ? 'on' : ''}" aria-pressed="${settings.sort === 'dist'}">Cercanía</button>
+  </div>`;
+function setSort(mode) {
+  if (settings.sort === mode) return;
+  settings.sort = mode;
+  saveSettings();
+  sfx('pop');
+  if (!$('#mq-res').hidden) mapSearch();
+  if ($('#s-especies').dataset.ok) renderEspecies();
+}
 function filtered() {
   const q = S.q.trim().toLowerCase();
-  return S.species.filter((s) =>
+  return sortSpecies(S.species.filter((s) =>
     (S.filter === 'todas' || (S.filter === 'nativas' && s.native) || (S.filter === 'endemicas' && s.endemic) || (S.filter === 'amenazadas' && s.threatened)) &&
-    (!q || s.sci.toLowerCase().includes(q) || (s.common || '').toLowerCase().includes(q)));
+    (!q || s.sci.toLowerCase().includes(q) || (s.common || '').toLowerCase().includes(q))));
 }
 function renderEspecies() {
   const el = $('#s-especies');
@@ -709,7 +727,7 @@ function renderEspecies() {
     el.innerHTML = `<div class="head">
       <div class="title-row"><a href="#mapa" class="icon-btn" aria-label="Volver al mapa">${I.back}</a><div style="flex:1;min-width:0"><h1>Flora del entorno</h1><span class="muted" style="font-size:13px" id="esp-sub"></span></div><button class="icon-btn" data-act="focus-q" aria-label="Buscar">${I.search}</button></div>
       <div class="search-row"><div class="search">${I.search}<label for="q" class="sr">Buscar especie por nombre común o científico</label><input id="q" type="search" placeholder="Buscar especie (nombre común o científico)…" autocomplete="off"></div><button class="icon-btn boxed" data-act="toggle-filters" aria-label="Filtros" id="btn-filters">${I.filter}</button></div>
-      <div class="filters" id="filters"></div></div><div class="scrollarea" id="esp-list"></div>
+      <div class="filters" id="filters"></div><div id="esp-sort"></div></div><div class="scrollarea" id="esp-list"></div>
       <div class="dlbar" id="dlbar"></div>`;
     $('#q').addEventListener('input', (e) => { S.q = e.target.value; renderEspecies(); });
   }
@@ -720,6 +738,7 @@ function renderEspecies() {
     .map(([id, l]) => `<button class="rad ${S.filter === id ? 'on' : ''}" data-filter="${id}" aria-pressed="${S.filter === id}">${l}</button>`).join('');
   const rows = filtered();
   $('#esp-sub').textContent = S.loading ? 'Cargando…' : `${nf(rows.length)} especies · Radio: ${S.radius} km`;
+  $('#esp-sort').innerHTML = sortToggle();
   const FM = [['xlsx', 'Excel', '(.xlsx)', '#1D7A45'], ['csv', 'CSV', '(.csv)', '#5B6B64'], ['pdf', 'PDF', '(.pdf)', '#C2412D'], ['kml', 'KML', '(.kml)', '#2A6FB5'], ['kmz', 'KMZ', '(.kmz)', '#6B4FB0']];
   $('#dlbar').innerHTML = `<button class="dl-toggle" data-act="dl-toggle" aria-expanded="${!!S.dlOpen}">${I.dl}<span>Descargar listado del entorno</span>${S.dlOpen ? I.down : I.up}</button>
     ${S.dlOpen ? `<div class="dl-tiles">${FM.map(([id, l, e, c]) => `<button data-dl="${id}" aria-label="Descargar en ${l}"><i style="background:${c}">${l[0]}</i><b>${l}</b><span>${e}</span></button>`).join('')}</div>` : ''}`;
@@ -1386,10 +1405,10 @@ function mapSearch() {
     if (ac < 0 && as < 0) continue;
     hits.push({ s, label, ac, as });
   }
-  hits.sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' }));
+  hits.sort((a, b) => (settings.sort === 'dist' ? byDist : byName)(a.s, b.s));
   box.hidden = false;
   box.innerHTML = S.loading ? '<div class="mq-empty">Buscando especies…</div>'
-    : hits.length ? `<div class="mq-count">${nf(hits.length)} especie${hits.length === 1 ? '' : 's'} · A–Z</div>`
+    : hits.length ? `<div class="mq-count"><span>${nf(hits.length)} especie${hits.length === 1 ? '' : 's'}</span>${sortToggle('sm')}</div>`
       + hits.slice(0, 50).map(({ s, label, ac, as }) => `<button data-mq="${esc(s.id)}">${thumb(s.photo, 'sm')}<span class="info"><b>${markPrefix(label, ac, q.length)}</b><span class="sci">${label === s.sci ? '' : markPrefix(s.sci, as, q.length)}</span></span><span class="d">${fmtDist(s.dist)}</span></button>`).join('')
       + `<button class="mq-all" data-act="mq-all">Ver en el listado de Especies ${I.right}</button>`
       : `<div class="mq-empty">Ninguna especie empieza con «${esc(raw)}» en ${S.radius} km.</div>`;
@@ -1493,6 +1512,8 @@ document.addEventListener('click', async (e) => {
     case 'tabs-hide': setTabsHidden(true); break;
     case 'tabs-show': setTabsHidden(false); break;
     case 'tabs-config': openTabsConfig(); break;
+    case 'sort-az': setSort('az'); break;
+    case 'sort-dist': setSort('dist'); break;
     case 'mq-all': S.q = $('#mq').value; hideMapSearch(); location.hash = '#especies'; setTimeout(() => { const q = $('#q'); if (q) q.value = S.q; renderEspecies(); }, 60); break;
     case 'open-settings': openSettings(); break;
     case 'credits': closeModal(); toast('Imágenes © Esri, Maxar, Earthstar Geographics · Mapa con Leaflet · Datos: GBIF, iNaturalist'); break;
