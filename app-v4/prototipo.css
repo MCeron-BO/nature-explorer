@@ -364,3 +364,8 @@ a.kcard{border-color:#BFE2C9;background:linear-gradient(90deg,#fff,#F1FAF3)}
 .menu label span{flex:1}
 #phone.tabs-off .dlbar{padding-bottom:40px}
 #phone.tabs-off .flow,#phone.tabs-off .scrollarea,#phone.tabs-off .screen.scroll{padding-bottom:44px}
+
+/* v4.3: autocompletado alfabético */
+.mq-res mark{background:#DFF2E4;color:var(--g900);font-weight:800;border-radius:3px;padding:0 1px}
+.mq-count{padding:6px 12px;font-size:11px;font-weight:700;color:var(--muted);background:var(--g50);border-bottom:1px solid var(--line);letter-spacing:.02em}
+.mq-res{max-height:min(360px,55vh)}
