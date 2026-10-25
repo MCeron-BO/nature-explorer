@@ -4,7 +4,7 @@
    - Teselas del mapa y fotos: primero lo guardado (las descarga «Guardar zona» o se guardan al verlas). */
 'use strict';
 // Cambiar VERSION al publicar cambios en la app para que los teléfonos descarguen la versión nueva.
-const VERSION = 'v4-offline-1';
+const VERSION = 'v4-offline-2';
 const SHELL = `nx4-shell-${VERSION}`;
 const API = 'nx4-api';
 const TILES = 'nx4-tiles';
