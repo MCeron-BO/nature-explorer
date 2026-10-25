@@ -696,8 +696,8 @@ function openProfile() {
 
 /* ---------- especies ---------- */
 // Orden de todas las búsquedas por especie (buscador del mapa y listado): A–Z o por cercanía.
-const spLabel = (s) => s.common || s.sci;
-const byName = (a, b) => spLabel(a).localeCompare(spLabel(b), 'es', { sensitivity: 'base' });
+// A–Z por nombre científico (único y estable en todo el mundo, a diferencia del nombre común).
+const byName = (a, b) => a.sci.localeCompare(b.sci, 'es', { sensitivity: 'base' });
 const byDist = (a, b) => (a.dist ?? Infinity) - (b.dist ?? Infinity) || byName(a, b);
 const sortSpecies = (list) => list.sort(settings.sort === 'dist' ? byDist : byName);
 const sortToggle = (extra = '') => `<div class="sort-tg ${extra}" role="group" aria-label="Ordenar especies">
