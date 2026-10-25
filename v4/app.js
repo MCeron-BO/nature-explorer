@@ -378,7 +378,6 @@ function initMap() {
     topo: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 })
   };
   baseLayers[settings.layer === 'topo' ? 'topo' : 'sat'].addTo(map);
-  L.control.scale({ position: 'bottomleft', imperial: false, maxWidth: 110 }).addTo(map);
   pointsLayer = L.layerGroup().addTo(map);
   circle = L.circle([S.area.lat, S.area.lng], { radius: S.radius * 1000, color: '#2FA35A', weight: 2, fillColor: '#5BC27C', fillOpacity: 0.22 }).addTo(map);
   userMarker = L.marker([S.pos.lat, S.pos.lng], { icon: avatarIcon(), zIndexOffset: 2000, draggable: settings.demo, autoPan: true }).addTo(map);
@@ -465,10 +464,7 @@ function placeFloating() {
   card.style.bottom = `${sh + 12}px`;
   r.style.bottom = `${above}px`;
   const fabs = $('#map-fabs');
-  if (fabs) fabs.style.bottom = `${above}px`;
-  const scale = document.querySelector('#map .leaflet-bottom.leaflet-left');
-  if (scale) scale.style.bottom = `${above + (r.hidden ? 0 : 50)}px`;
-}
+  if (fabs) fabs.style.bottom = `${above}px`;}
 // Tocar una planta del mapa abre su ficha de captura; tocar el mapa vacío o la X la cierra.
 function selectPoint(p) {
   S.selected = p;
@@ -1363,17 +1359,41 @@ function openTabsConfig() {
 }
 /* ---------- buscador de especies sobre el mapa ---------- */
 function hideMapSearch() { const r = $('#mq-res'); if (r) { r.hidden = true; r.innerHTML = ''; } }
+// Autocompletado: desde la primera letra muestra las especies cuyo nombre (común o científico)
+// tiene alguna palabra que empieza con lo escrito, ordenadas alfabéticamente.
+const fold = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+function prefixAt(name, q) {
+  // Devuelve la posición donde una palabra del nombre empieza con q, o -1.
+  const f = fold(name);
+  if (f.startsWith(q)) return 0;
+  const m = f.search(new RegExp(`[\\s\\-(]${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+  return m < 0 ? -1 : m + 1;
+}
+function markPrefix(name, at, len) {
+  if (at < 0) return esc(name);
+  return `${esc(name.slice(0, at))}<mark>${esc(name.slice(at, at + len))}</mark>${esc(name.slice(at + len))}`;
+}
 function mapSearch() {
-  const q = $('#mq').value.trim().toLowerCase();
+  const raw = $('#mq').value.trim();
+  const q = fold(raw);
   const box = $('#mq-res');
-  if (q.length < 2) { hideMapSearch(); return; }
-  const score = (s) => { const c = (s.common || '').toLowerCase(), n = s.sci.toLowerCase(); return c.startsWith(q) || n.startsWith(q) ? 0 : c.includes(q) || n.includes(q) ? 1 : 9; };
-  const hits = S.species.map((s) => ({ s, k: score(s) })).filter((x) => x.k < 9).sort((a, b) => a.k - b.k || (a.s.dist ?? 1e12) - (b.s.dist ?? 1e12)).slice(0, 6);
+  if (!q) { hideMapSearch(); return; }
+  const hits = [];
+  for (const s of S.species) {
+    const label = s.common || s.sci;
+    const ac = prefixAt(label, q);
+    const as = prefixAt(s.sci, q);
+    if (ac < 0 && as < 0) continue;
+    hits.push({ s, label, ac, as });
+  }
+  hits.sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' }));
   box.hidden = false;
   box.innerHTML = S.loading ? '<div class="mq-empty">Buscando especies…</div>'
-    : hits.length ? hits.map(({ s }) => `<button data-mq="${esc(s.id)}">${thumb(s.photo, 'sm')}<span class="info"><b>${esc(s.common || s.sci)}</b><span class="sci">${esc(s.sci)}</span></span><span class="d">${fmtDist(s.dist)}</span></button>`).join('')
-      + `<button class="mq-all" data-act="mq-all">Ver todos los resultados en Especies ${I.right}</button>`
-      : `<div class="mq-empty">No hay «${esc($('#mq').value.trim())}» en ${S.radius} km. Prueba con un radio mayor.</div>`;
+    : hits.length ? `<div class="mq-count">${nf(hits.length)} especie${hits.length === 1 ? '' : 's'} · A–Z</div>`
+      + hits.slice(0, 50).map(({ s, label, ac, as }) => `<button data-mq="${esc(s.id)}">${thumb(s.photo, 'sm')}<span class="info"><b>${markPrefix(label, ac, q.length)}</b><span class="sci">${label === s.sci ? '' : markPrefix(s.sci, as, q.length)}</span></span><span class="d">${fmtDist(s.dist)}</span></button>`).join('')
+      + `<button class="mq-all" data-act="mq-all">Ver en el listado de Especies ${I.right}</button>`
+      : `<div class="mq-empty">Ninguna especie empieza con «${esc(raw)}» en ${S.radius} km.</div>`;
+  box.scrollTop = 0;
 }
 // Elegir un resultado lleva el mapa al registro más cercano de esa especie y abre su ficha de captura.
 function goToSpecies(id) {
