@@ -26,6 +26,19 @@ Abre http://localhost:5176
 - El nivel y el XP se ven en la pantalla de inicio, en Mis Observaciones y en Más.
 - El botón de capas alterna entre mapa **satelital** y **topográfico**.
 
+## Uso sin conexión (cerros y montañas sin señal)
+
+1. **Antes de salir, con conexión:** en el mapa elige el radio y toca el botón de la nube (o **Más › Mapa sin conexión**) y luego **Guardar esta zona**. Se descargan:
+   - el mapa del radio (satelital o topográfico, según la capa activa) desde zoom 10 hasta el máximo que quepa en ~2.600 partes;
+   - las especies, sus registros y coordenadas, y sus familias;
+   - las fotos que lo permiten (las de licencia abierta de iNaturalist).
+2. **En terreno, sin señal:** la app abre igual (queda guardada en el teléfono). El GPS no necesita datos móviles, así que tu posición, las capturas y los nuevos registros se ubican sobre el mapa guardado. La validación usa los registros de la zona y queda marcada **por verificar**; el catálogo busca entre las especies de la zona.
+3. **Al volver la conexión:** la app verifica sola con iNaturalist y GBIF las observaciones hechas sin señal, recarga los datos en vivo y te recuerda las que quedaron por publicar en iNaturalist.
+
+Lo que necesita conexión sí o sí: la identificación con IA (token de iNaturalist), el gráfico de observaciones por mes, las fichas de especies que no hayas abierto antes y publicar en iNaturalist.
+
+Técnicamente: `sw.js` es un *service worker* (app y librerías guardadas; APIs con red primero y respaldo guardado; mapa y fotos con lo guardado primero). Al publicar cambios, sube `VERSION` en `sw.js`.
+
 ## Datos guardados
 
 En `localStorage` con claves propias (`nx4.settings`, `nx4.collection`, `nx4.game`), separadas de las otras versiones.

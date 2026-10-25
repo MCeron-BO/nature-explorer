@@ -378,3 +378,18 @@ a.kcard{border-color:#BFE2C9;background:linear-gradient(90deg,#fff,#F1FAF3)}
 .sort-tg.sm button{height:24px;padding:0 9px;font-size:11px}
 .sort-tg.sm span{font-size:11px}
 .mq-count{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 8px 4px 12px}
+
+/* v4.5: uso sin conexión */
+#btn-offline{position:relative}
+#btn-offline.saved{color:var(--g900)!important}
+#btn-offline.saved::after{content:"";position:absolute;top:4px;right:4px;width:9px;height:9px;border-radius:999px;background:var(--g700);border:2px solid #fff}
+body.is-offline .map-title span:not(.logo-leaf){color:#B23A2E;font-weight:800}
+.off-state{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;padding:8px 12px;border-radius:12px}
+.off-state i{width:10px;height:10px;border-radius:999px}
+.off-state.on{background:var(--g50);color:var(--g900)}.off-state.on i{background:var(--g700)}
+.off-state.off{background:#FCECEA;color:#9A2B21}.off-state.off i{background:#D0463A}
+.zone-card{display:flex;flex-direction:column;gap:4px;border:1px solid var(--line2);border-radius:14px;padding:12px;font-size:13px;color:var(--ink2)}
+.zone-card b{font-size:14px;color:var(--ink)}
+.zone-card .two{margin-top:6px}
+.zone-job:empty{display:none}
+.zone-job{display:flex;flex-direction:column;gap:6px;background:var(--g50);border-radius:14px;padding:12px;font-size:13px}
