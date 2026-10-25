@@ -326,15 +326,17 @@ async function loadArea() {
     S.points = points;
     S.nearest = nearest;
     S.counts = { total: S.species.length, native: nat.total_results, endemic: end.total_results, threatened: thr.total_results };
+    S.offline = false;
   } catch (e) {
     if (seq !== loadArea.seq) return;
-    S.error = 'No se pudo consultar GBIF / iNaturalist. Revisa tu conexión e inténtalo de nuevo.';
+    if (!restoreFromZone()) S.error = navigator.onLine ? 'No se pudo consultar GBIF / iNaturalist. Revisa tu conexión e inténtalo de nuevo.' : 'Sin conexión y sin zona guardada. Guarda una zona antes de salir a terreno (Más › Mapa sin conexión).';
     console.error(e);
   }
   S.loading = false;
   S.band = null;
   renderSheet(); renderPoints(); renderNear(); renderEspecies();
   radarCheck(true);
+  renderOfflineBadge();
   if (route().name === 'coleccion') renderColeccion();
 }
 const findSp = (id) => S.species.find((s) => s.id === id) || S.ficha?.sp || S.collection.find((c) => c.id === id);
@@ -361,6 +363,7 @@ function openMore() {
       <button data-act="profile">${I.star}<span>Perfil, avatar y logros</span>${I.right}</button>
       <button data-act="open-settings">${I.filter}<span>Ajustes: ubicación, sonido e IA</span>${I.right}</button>
       <button data-act="credits">${I.book}<span>Créditos del mapa y los datos</span>${I.right}</button>
+      <button data-act="offline">${I.dl}<span>Mapa sin conexión</span>${I.right}</button>
       <button data-act="tabs-config">${I.filter}<span>Personalizar la barra inferior</span>${I.right}</button>
       <a href="#inicio">${I.leaf}<span>Volver a elegir reino</span>${I.right}</a>
     </div>`);
@@ -372,10 +375,10 @@ function initMap() {
   map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true, zoomSnap: 0.25, zoomDelta: 0.5 }).setView([S.pos.lat, S.pos.lng], 14);
   baseLayers = {
     sat: L.layerGroup([
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }),
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, opacity: 0.8 })
+      L.tileLayer(TILE_URLS.sat, { maxZoom: 19, crossOrigin: true }),
+      L.tileLayer(TILE_URLS.lbl, { maxZoom: 19, opacity: 0.8, crossOrigin: true })
     ]),
-    topo: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 })
+    topo: L.tileLayer(TILE_URLS.topo, { maxZoom: 19, crossOrigin: true })
   };
   baseLayers[settings.layer === 'topo' ? 'topo' : 'sat'].addTo(map);
   pointsLayer = L.layerGroup().addTo(map);
@@ -550,7 +553,7 @@ function renderRadii() {
   $('#km-dec').disabled = S.radius <= KM_MIN;
   $('#km-inc').disabled = S.radius >= KM_MAX;
   const ll = $('#loc-label');
-  ll.textContent = `Flora · ${settings.demo ? 'ubicación de prueba' : 'mi ubicación'}`;
+  ll.textContent = `Flora · ${!navigator.onLine ? 'sin conexión' : settings.demo ? 'ubicación de prueba' : 'mi ubicación'}`;
   ll.title = S.posLabel;
 }
 function renderNear() {
@@ -608,7 +611,7 @@ function renderSheet() {
   const min = S.sheet === 'min';
   sh.classList.toggle('min', min);
   const title = S.loading ? 'Buscando especies…' : S.error ? 'No se pudieron cargar las especies' : `${nf(c.total)} especies de plantas`;
-  const sub = S.loading ? 'Consultando GBIF e iNaturalist' : S.error ? 'Revisa tu conexión' : `en un radio de ${S.radius} km`;
+  const sub = S.loading ? 'Consultando GBIF e iNaturalist' : S.error ? 'Revisa tu conexión' : S.offline ? `en ${S.radius} km · zona guardada sin conexión` : `en un radio de ${S.radius} km`;
   const head = `<span class="grab" aria-hidden="true"></span><button class="sheet-head${min ? ' compact' : ''}" data-act="${min ? 'sheet-up' : open ? 'sheet' : 'sheet-min'}" aria-label="${min ? 'Mostrar resumen' : open ? 'Contraer lista' : 'Minimizar panel'}">
       <span class="logo-leaf sm" aria-hidden="true"></span><span class="t"><b>${title}</b><span>${sub}</span></span><span class="chev">${min ? I.up : I.down}</span></button>`;
   if (min) { sh.innerHTML = head; renderNear(); return; }
@@ -942,24 +945,34 @@ async function fichaPdf() {
 }
 
 /* ---------- validación (común a captura y nuevo registro) ---------- */
-async function recordsAround(taxon, km) {
-  const { lat, lng } = S.pos;
+// Registros de una especie a menos de km de tu posición. Con conexión consulta iNaturalist y GBIF;
+// sin conexión (o si ambas fallan) cuenta los registros de la zona guardada y devuelve offline: true.
+async function recordsAround(taxon, km, lat = S.pos.lat, lng = S.pos.lng) {
+  let failed = 0;
   const [a, b] = await Promise.all([
-    getJSON(`${INAT}/observations?taxon_id=${taxon.id}&lat=${lat}&lng=${lng}&radius=${km}&quality_grade=research&per_page=0`).then((r) => r.total_results).catch(() => 0),
+    getJSON(`${INAT}/observations?taxon_id=${taxon.id}&lat=${lat}&lng=${lng}&radius=${km}&quality_grade=research&per_page=0`).then((r) => r.total_results).catch(() => { failed++; return 0; }),
     (async () => {
       const m = await getJSON(`${GBIF}/species/match?name=${encodeURIComponent(taxon.name)}&kingdom=Plantae`);
       const k = m.speciesKey || m.usageKey;
       if (!k || m.matchType === 'NONE') return 0;
       return (await getJSON(`${GBIF}/occurrence/search?taxonKey=${k}&geoDistance=${lat},${lng},${km}km&limit=0`)).count;
-    })().catch(() => 0)
+    })().catch(() => { failed++; return 0; })
   ]);
-  return a + b;
+  if (failed < 2) return { n: a + b, offline: false };
+  const zone = loadZone();
+  const key = key2(taxon.name);
+  const n = (zone?.points || []).filter((p) => p.k === key && dist({ lat, lng }, p) <= km * 1000).length;
+  return { n, offline: true, inZone: !!zone?.species.some((s) => key2(s.sci) === key), zoneKm: zone?.radius || 0 };
 }
-async function classify(taxon) {
-  const near = await recordsAround(taxon, S.radius);
-  if (near > 0) return { status: 'validada', near };
-  const wide = await recordsAround(taxon, 50);
-  return { status: wide > 0 ? 'nuevo_local' : 'ampliacion', near: 0, wide };
+async function classify(taxon, lat, lng) {
+  const near = await recordsAround(taxon, S.radius, lat, lng);
+  if (near.n > 0) return { status: 'validada', near: near.n, offline: near.offline };
+  if (near.offline) {
+    // Sin señal solo se conoce la zona guardada: se clasifica de forma provisional y se verifica al volver la conexión.
+    return { status: near.inZone ? 'nuevo_local' : 'ampliacion', near: 0, offline: true, provisional: true };
+  }
+  const wide = await recordsAround(taxon, 50, lat, lng);
+  return { status: wide.n > 0 ? 'nuevo_local' : 'ampliacion', near: 0, wide: wide.n };
 }
 async function criteriaFor(taxon, hasPhoto, usedAI) {
   const month = new Date().getMonth() + 1;
@@ -968,17 +981,18 @@ async function criteriaFor(taxon, hasPhoto, usedAI) {
     getJSON(`${INAT}/observations/histogram?taxon_id=${taxon.id}&date_field=observed&interval=month_of_year&quality_grade=research&lat=${S.pos.lat}&lng=${S.pos.lng}&radius=200`).then((r) => r.results.month_of_year).catch(() => null)
   ]);
   const inMonth = hist ? hist[month] || 0 : 0;
+  const off = wide.offline ? ' (zona guardada)' : '';
   return [
     { ok: hasPhoto, label: 'Fotografía del usuario', d: usedAI ? 'Analizada por visión de iNaturalist' : hasPhoto ? 'Adjunta (sin análisis visual)' : 'Sin foto' },
-    { ok: wide > 0, label: 'Distribución geográfica', d: wide > 0 ? `${nf(wide)} registros en 50 km` : 'Sin registros en 50 km' },
-    { ok: inMonth > 0, label: 'Época del año', d: hist ? `${nf(inMonth)} obs. en ${new Date().toLocaleString('es', { month: 'long' })}` : '—' },
-    { ok: near1 > 0, label: 'Registros cercanos', d: `${nf(near1)} en 1 km` },
-    { ok: !!taxon.is_active || taxon.is_active == null, label: 'Catálogo taxonómico', d: 'iNaturalist · GBIF Backbone' }
+    { ok: wide.n > 0, label: 'Distribución geográfica', d: wide.n > 0 ? `${nf(wide.n)} registros${wide.offline ? ` en ${wide.zoneKm} km` : ' en 50 km'}${off}` : `Sin registros${off}` },
+    { ok: inMonth > 0, label: 'Época del año', d: hist ? `${nf(inMonth)} obs. en ${new Date().toLocaleString('es', { month: 'long' })}` : 'Se verifica con conexión' },
+    { ok: near1.n > 0, label: 'Registros cercanos', d: `${nf(near1.n)} en 1 km${near1.offline ? ' (zona guardada)' : ''}` },
+    { ok: !!taxon.is_active || taxon.is_active == null, label: 'Catálogo taxonómico', d: navigator.onLine ? 'iNaturalist · GBIF Backbone' : 'Catálogo de la zona guardada' }
   ];
 }
 async function computerVision(file, lat, lng) {
   // Requiere un token de API de iNaturalist (https://www.inaturalist.org/users/api_token), válido 24 h.
-  if (!settings.token) return null;
+  if (!settings.token || !navigator.onLine) return null;
   const fd = new FormData();
   fd.append('image', file); fd.append('lat', lat); fd.append('lng', lng); fd.append('observed_on', today());
   const r = await getJSON(`${INAT}/computervision/score_image?locale=es`, { method: 'POST', headers: { Authorization: settings.token }, body: fd });
@@ -1120,7 +1134,8 @@ async function onCapturePhoto(file) {
   try { c.preview = await shrink(file); } catch { c.preview = ''; }
   try {
     stage('Buscando la especie en el catálogo de iNaturalist…');
-    const capT = c.sp.inatId ? (await getJSON(`${INAT}/taxa/${c.sp.inatId}?locale=es`)).results[0] : await resolveTaxon(c.sp);
+    // Sin conexión se usa la especie tal como quedó en la zona guardada.
+    const capT = await (c.sp.inatId ? getJSON(`${INAT}/taxa/${c.sp.inatId}?locale=es`).then((r) => r.results[0]) : resolveTaxon(c.sp)).catch(() => null) || offlineTaxon(c.sp);
     if (!capT) throw new Error('Esta especie no está en el catálogo de iNaturalist, así que no se puede validar con foto.');
     if (!alive()) return;
     let matches = null;
@@ -1166,7 +1181,7 @@ async function confirmCapture() {
   c.confirming = false;
   if (S.capture !== c) return;
   const prevEntry = S.collection.find((o) => o.uid === c.uid);
-  addToCollection(Object.assign({}, prevEntry, { uid: c.uid, id: String(t.id), taxonId: t.id, sci: t.name, common: cap(t.preferred_common_name), photo: photoUrl(t.default_photo, 'square') || c.sp.photo, userPhoto: c.preview, status: c.result.status, conf: c.matches[c.pick].pct, date: today(), lat: S.pos.lat, lng: S.pos.lng, kind: 'captura' }));
+  addToCollection(Object.assign({}, prevEntry, { uid: c.uid, id: String(t.id), taxonId: t.id, sci: t.name, common: cap(t.preferred_common_name), photo: photoUrl(t.default_photo, 'square') || c.sp.photo, userPhoto: c.preview, status: c.result.status, conf: c.matches[c.pick].pct, date: today(), lat: S.pos.lat, lng: S.pos.lng, kind: 'captura', pendingSync: !!c.result.offline }));
   c.xp = STATUS_XP[c.result.status] || 0;
   c.step = 'resultado'; renderCaptura();
   sfx(c.result.status === 'validada' ? 'badge' : 'levelup');
@@ -1241,7 +1256,13 @@ async function catalogSearch() {
     const r = await getJSON(`${INAT}/taxa/autocomplete?q=${encodeURIComponent(n.q)}&taxon_id=${PLANTAE}&locale=es&per_page=6`);
     n.catalog = r.results;
     box.innerHTML = r.results.map((t, i) => `<button class="nv-match" data-cat="${i}">${thumb(photoUrl(t.default_photo, 'square'), 'sm')}<span class="info"><b class="sci">${esc(t.name)}</b><span>${esc(cap(t.preferred_common_name) || t.rank)}</span></span></button>`).join('') || '<div class="muted" style="font-size:14px">Sin coincidencias.</div>';
-  } catch { box.innerHTML = '<div class="muted">No se pudo consultar el catálogo.</div>'; }
+  } catch {
+    // Sin conexión: busca entre las especies de la zona guardada.
+    const q = fold(n.q.trim());
+    const local = S.species.filter((s) => prefixAt(s.common || '', q) >= 0 || prefixAt(s.sci, q) >= 0).sort(byName).slice(0, 8);
+    n.catalog = local.map(offlineTaxon);
+    box.innerHTML = local.length ? `<div class="muted" style="font-size:12px;margin-bottom:4px">Sin conexión · especies de la zona guardada</div>` + n.catalog.map((t, i) => `<button class="nv-match" data-cat="${i}">${thumb(photoUrl(t.default_photo, 'square'), 'sm')}<span class="info"><b class="sci">${esc(t.name)}</b><span>${esc(cap(t.preferred_common_name))}</span></span></button>`).join('') : '<div class="muted" style="font-size:13px">Sin conexión y sin coincidencias en la zona guardada.</div>';
+  }
 }
 // Agrega fotos (la primera inicia GPS, fecha, sugerencias y validación), o reemplaza la principal.
 async function onNuevoPhoto(files, how) {
@@ -1257,7 +1278,7 @@ async function onNuevoPhoto(files, how) {
   n.locating = true; renderNuevo();
   await new Promise((res) => {
     const done = (lat, lng, acc) => { Object.assign(n, { lat, lng, acc, locating: false }); res(); };
-    if (!settings.demo && navigator.geolocation) navigator.geolocation.getCurrentPosition((p) => done(p.coords.latitude, p.coords.longitude, p.coords.accuracy), () => done(S.pos.lat, S.pos.lng, null), { enableHighAccuracy: true, timeout: 8000 });
+    if (!settings.demo && navigator.geolocation) navigator.geolocation.getCurrentPosition((p) => done(p.coords.latitude, p.coords.longitude, p.coords.accuracy), () => done(S.pos.lat, S.pos.lng, null), { enableHighAccuracy: true, timeout: navigator.onLine ? 8000 : 25000 });
     else done(S.pos.lat, S.pos.lng, null);
   });
   nuevoIdentify();
@@ -1281,15 +1302,16 @@ async function nuevoClassify() {
   const run = (n.crun = (n.crun || 0) + 1);
   n.classifying = true; n.result = null;
   if (route().name === 'nuevo') renderNuevo();
-  try { n.result = await classify(m.taxon); } catch { toast('No se pudo validar. Revisa tu conexión.'); }
+  try { n.result = await classify(m.taxon, n.lat, n.lng); } catch { toast('No se pudo validar. Revisa tu conexión.'); }
   if (S.nuevo !== n || n.crun !== run) return;
   n.classifying = false;
   if (route().name === 'nuevo') renderNuevo();
 }
 function nuevoSave() {
   const n = S.nuevo, t = n.matches[n.pick].taxon;
-  addToCollection({ uid: n.uid, id: String(t.id), taxonId: t.id, sci: t.name, common: cap(t.preferred_common_name), photo: photoUrl(t.default_photo, 'square'), userPhoto: n.photos[n.main].preview, photos: n.photos.length, status: n.result.status, conf: n.matches[n.pick].pct, notes: n.notes, date: n.when.slice(0, 10), when: n.when, lat: n.lat, lng: n.lng, kind: 'nuevo' });
-  if (n.publish) window.open('https://www.inaturalist.org/observations/upload', '_blank', 'noopener');
+  addToCollection({ uid: n.uid, id: String(t.id), taxonId: t.id, sci: t.name, common: cap(t.preferred_common_name), photo: photoUrl(t.default_photo, 'square'), userPhoto: n.photos[n.main].preview, photos: n.photos.length, status: n.result.status, conf: n.matches[n.pick].pct, notes: n.notes, date: n.when.slice(0, 10), when: n.when, lat: n.lat, lng: n.lng, kind: 'nuevo', pendingSync: !!n.result.offline, publishLater: n.publish && !navigator.onLine });
+  if (n.publish && navigator.onLine) window.open('https://www.inaturalist.org/observations/upload', '_blank', 'noopener');
+  else if (n.publish) toast('Sin conexión: te recordaremos publicarla en iNaturalist al volver la señal.');
   n.saved = true; renderNuevo();
   // Registrar algo tú mismo vale un extra de +20 XP sobre la recompensa por resultado.
   sfx('badge');
@@ -1323,7 +1345,7 @@ function renderColeccion() {
       ${S.loading ? '<div class="state"><div class="spinner"></div></div>' : `<div class="grid3">${targets.map((s) => got.has(s.inatId)
         ? `<a class="cc" href="#ficha/${esc(s.id)}" style="--rc:${rarity(s).color}"><div class="ph" style="background-image:url('${esc(s.photoM)}')"><span class="ok">${I.check}</span></div><div class="t"><b>${esc(s.common || s.sci)}</b><span style="font-size:11px;font-weight:800;color:var(--ink2)">${stars(rarity(s))}</span></div></a>`
         : `<a class="cc lock" href="#ficha/${esc(s.id)}"><div class="ph" style="background-image:url('${esc(s.photo)}')"><span class="lk">❓</span></div><div class="t"><b style="color:var(--muted)">${esc(s.common || s.sci)}</b><span class="muted" style="font-size:11px;font-weight:700">a ${fmtDist(s.dist)}</span></div></a>`).join('')}</div>`}`
-    : (col.length ? groups.map(([st, title, color]) => { const items = by(st); return items.length ? `<section style="margin-bottom:16px"><div style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:${color}"></span><b>${title}</b><span class="muted">${items.length}</span></div>${items.map((o) => `<div class="sp">${thumb(o.userPhoto || o.photo, 'sm')}<div class="info"><span style="font-weight:600">${esc(o.common || o.sci)}</span><span class="sci">${esc(o.sci)}</span><span class="muted" style="font-size:12px">${esc(o.date)}${o.conf != null ? ` · ${o.conf} % IA` : ''} · ${o.kind === 'nuevo' ? 'nuevo registro' : 'captura'}</span></div>${st === 'pendiente' ? `<button class="btn" style="height:36px;width:auto;font-size:13px;border-radius:999px" data-revalidate="${esc(o.uid)}">Validar</button>` : `<button class="x" aria-label="Eliminar" data-del="${esc(o.uid)}">${I.x}</button>`}</div>`).join('')}</section>` : ''; }).join('')
+    : (col.length ? groups.map(([st, title, color]) => { const items = by(st); return items.length ? `<section style="margin-bottom:16px"><div style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:${color}"></span><b>${title}</b><span class="muted">${items.length}</span></div>${items.map((o) => `<div class="sp">${thumb(o.userPhoto || o.photo, 'sm')}<div class="info"><span style="font-weight:600">${esc(o.common || o.sci)}</span><span class="sci">${esc(o.sci)}</span><span class="muted" style="font-size:12px">${esc(o.date)}${o.conf != null ? ` · ${o.conf} % IA` : ''} · ${o.kind === 'nuevo' ? 'nuevo registro' : 'captura'}${o.pendingSync ? ' · por verificar' : ''}${o.publishLater ? ' · por publicar' : ''}</span></div>${st === 'pendiente' ? `<button class="btn" style="height:36px;width:auto;font-size:13px;border-radius:999px" data-revalidate="${esc(o.uid)}">Validar</button>` : `<button class="x" aria-label="Eliminar" data-del="${esc(o.uid)}">${I.x}</button>`}</div>`).join('')}</section>` : ''; }).join('')
       : '<div class="state">Aún no tienes observaciones. Captura una especie desde el mapa.</div>')}</div>`;
 }
 
@@ -1347,6 +1369,194 @@ function closeModal() { $('#modal').hidden = true; $('#modal').innerHTML = ''; }
 
 /* ---------- router ---------- */
 function route() { const [name, arg] = location.hash.slice(1).split('/'); return { name: name || 'inicio', arg: arg && decodeURIComponent(arg) }; }
+/* ---------- uso sin conexión: zona guardada ---------- */
+// «Guardar zona» descarga el mapa del radio elegido (teselas), las especies, sus registros y fotos.
+// Sin señal, la app usa esa zona: el GPS del teléfono sigue entregando coordenadas aunque no haya datos,
+// así que las capturas y los nuevos registros se ubican sobre el mapa guardado y se verifican al volver la conexión.
+const TILE_URLS = {
+  sat: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  lbl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+  topo: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}'
+};
+const MAX_TILES = 2600;
+const loadZone = () => ls.get('nx4.zone', null);
+const offlineTaxon = (sp) => ({ id: sp.inatId, name: sp.sci, preferred_common_name: sp.common, default_photo: { square_url: sp.photo, medium_url: sp.photoM }, is_active: true, rank: 'species' });
+const zoneCovers = (z, center, km) => !!z && dist(center, z.area) + km * 1000 <= z.radius * 1000 + 50;
+function tileXY(lat, lng, z) {
+  const n = 2 ** z, r = (lat * Math.PI) / 180;
+  return { x: Math.floor(((lng + 180) / 360) * n), y: Math.floor(((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * n) };
+}
+// Teselas que cubren el círculo del radio, desde zoom 10 hasta el mayor que quepa en MAX_TILES.
+function zoneTiles(area, km, layer) {
+  const dLat = km / 110.574, dLng = km / (111.32 * Math.cos((area.lat * Math.PI) / 180));
+  const range = (z) => { const a = tileXY(area.lat + dLat, area.lng - dLng, z), b = tileXY(area.lat - dLat, area.lng + dLng, z); return { a, b, n: (b.x - a.x + 1) * (b.y - a.y + 1) }; };
+  let zMax = 17;
+  const total = (zm) => { let t = 0; for (let z = 10; z <= zm; z++) t += range(z).n * (layer === 'sat' && z <= 14 ? 2 : 1); return t; };
+  while (zMax > 12 && total(zMax) > MAX_TILES) zMax--;
+  const urls = [];
+  for (let z = 10; z <= zMax; z++) {
+    const { a, b } = range(z);
+    for (let x = a.x; x <= b.x; x++) for (let y = a.y; y <= b.y; y++) {
+      const fill = (t) => t.replace('{z}', z).replace('{y}', y).replace('{x}', x);
+      urls.push(fill(TILE_URLS[layer === 'topo' ? 'topo' : 'sat']));
+      if (layer !== 'topo' && z <= 14) urls.push(fill(TILE_URLS.lbl));
+    }
+  }
+  return { urls, zMax };
+}
+async function fetchInto(cacheName, list, job) {
+  const cache = await caches.open(cacheName);
+  let i = 0;
+  const worker = async () => {
+    while (i < list.length && !job.cancel) {
+      const url = list[i++];
+      try {
+        if (!(await cache.match(url))) {
+          const res = await fetch(url, { mode: 'cors' });
+          if (res.ok && res.type !== 'opaque') { await cache.put(url, res.clone()); job.bytes += Number(res.headers.get('content-length')) || 15000; }
+        }
+      } catch { job.failed++; }
+      job.done++;
+      if (job.done % 20 === 0 || job.done === job.total) renderZoneJob();
+    }
+  };
+  await Promise.all(Array.from({ length: 6 }, worker));
+}
+function zonePlan() {
+  const layer = settings.layer === 'topo' ? 'topo' : 'sat';
+  const { urls, zMax } = zoneTiles(S.area, S.radius, layer);
+  const photos = [...new Set(S.species.flatMap((s, i) => [s.photo, i < 150 ? s.photoM : null]).filter(Boolean))];
+  // Estimación: ~16 KB por parte del mapa, ~6 KB por miniatura y ~75 KB por foto mediana.
+  const medium = photos.filter((u) => /medium/.test(u)).length;
+  return { layer, tiles: urls, zMax, photos, mb: Math.round((urls.length * 16000 + (photos.length - medium) * 6000 + medium * 75000) / 1e5) / 10 };
+}
+async function downloadZone() {
+  if (!navigator.onLine) { toast('Necesitas conexión para guardar la zona.'); return; }
+  if (S.loading || !S.species.length || S.offline) { toast('Espera a que carguen las especies de la zona.'); return; }
+  if (!('caches' in window)) { toast('Este navegador no permite guardar mapas.'); return; }
+  const plan = zonePlan();
+  const job = (S.zoneJob = { done: 0, total: plan.tiles.length + plan.photos.length + 1, failed: 0, bytes: 0, cancel: false, step: 'Preparando especies…' });
+  renderZoneJob();
+  try { await navigator.storage?.persist?.(); } catch { /* opcional */ }
+  await familiesFor(S.species);
+  job.done++; job.step = 'Descargando el mapa…'; renderZoneJob();
+  await fetchInto('nx4-tiles', plan.tiles, job);
+  job.step = 'Descargando fotos…'; renderZoneJob();
+  await fetchInto('nx4-img', plan.photos, job);
+  if (job.cancel) { S.zoneJob = null; toast('Descarga cancelada.'); openOfflineModal(); return; }
+  const snap = {
+    v: 1, at: new Date().toISOString(), area: { ...S.area }, radius: S.radius, label: S.posLabel, layer: plan.layer, zMax: plan.zMax,
+    tiles: plan.tiles.length, photos: plan.photos.length, mb: Math.round(job.bytes / 1e5) / 10,
+    counts: S.counts, inatTotal: S.inatTotal, gbifSpecies: S.gbifSpecies,
+    species: S.species.map((s) => ({ id: s.id, inatId: s.inatId, sci: s.sci, common: s.common, family: s.family, photo: s.photo, photoM: s.photoM, attr: s.attr, inatCount: s.inatCount, gbifCount: s.gbifCount, gbifKey: s.gbifKey, native: s.native, endemic: s.endemic, threatened: s.threatened, status: s.status, gbifOnly: s.gbifOnly })),
+    points: S.points.filter((p) => p.sp).map((p) => ({ src: p.src, lat: p.lat, lng: p.lng, k: p.k, url: p.url, spId: p.sp.id }))
+  };
+  ls.set('nx4.zone', snap);
+  S.zoneJob = null;
+  if (!loadZone()) { toast('No hubo espacio para guardar los datos de la zona.'); return; }
+  sfx('badge');
+  toast(`Zona guardada: ${S.radius} km · ${nf(snap.species.length)} especies · ${snap.mb} MB`);
+  renderOfflineBadge();
+  openOfflineModal();
+}
+async function deleteZone() {
+  ls.set('nx4.zone', null);
+  try { localStorage.removeItem('nx4.zone'); } catch { /* sin almacenamiento */ }
+  try { await caches.delete('nx4-tiles'); await caches.delete('nx4-img'); } catch { /* opcional */ }
+  toast('Zona sin conexión borrada.');
+  renderOfflineBadge();
+  openOfflineModal();
+}
+// Sin señal: rearma especies y registros desde la zona guardada, con distancias a tu posición actual.
+function restoreFromZone() {
+  const z = loadZone();
+  if (!z) return false;
+  const all = !zoneCovers(z, S.area, S.radius) ? false : true;
+  const byId = new Map(z.species.map((s) => [s.id, Object.assign({}, s, { dist: null, at: null })]));
+  const R = S.radius * 1000;
+  const points = z.points.map((p) => Object.assign({}, p, { sp: byId.get(p.spId) })).filter((p) => p.sp && dist(S.area, p) <= R);
+  let nearest = null;
+  for (const p of points) {
+    const d = dist(S.pos, p);
+    if (p.sp.dist == null || d < p.sp.dist) { p.sp.dist = d; p.sp.at = { lat: p.lat, lng: p.lng }; }
+    if (!nearest || d < nearest.d) nearest = { d, sp: p.sp, lat: p.lat, lng: p.lng };
+  }
+  const inRange = new Set(points.map((p) => p.sp));
+  S.species = [...byId.values()].filter((s) => all || inRange.has(s)).sort((a, b) => (a.dist ?? 1e12) - (b.dist ?? 1e12));
+  S.points = points;
+  S.nearest = nearest;
+  S.counts = { total: S.species.length, native: S.species.filter((s) => s.native).length, endemic: S.species.filter((s) => s.endemic).length, threatened: S.species.filter((s) => s.threatened).length };
+  S.inatTotal = z.inatTotal; S.gbifSpecies = z.gbifSpecies;
+  S.offline = true;
+  S.error = null;
+  return true;
+}
+// Al volver la señal: verifica con iNaturalist y GBIF lo que se clasificó sin conexión.
+async function syncPending() {
+  const pend = S.collection.filter((o) => o.pendingSync && o.taxonId);
+  if (!pend.length || !navigator.onLine) return;
+  let changed = 0;
+  for (const o of pend) {
+    try {
+      const r = await classify({ id: o.taxonId, name: o.sci }, o.lat, o.lng);
+      if (r.offline) continue;
+      if (o.status !== 'pendiente' && r.status !== o.status) changed++;
+      if (o.status !== 'pendiente') o.status = r.status;
+      o.pendingSync = false;
+    } catch { /* se reintenta en la próxima conexión */ }
+  }
+  saveCollection();
+  const done = pend.filter((o) => !o.pendingSync).length;
+  if (done) toast(`Se verificaron ${done} observación${done === 1 ? '' : 'es'} hecha${done === 1 ? '' : 's'} sin conexión${changed ? ` · ${changed} cambió de resultado` : ''}.`);
+  const pub = S.collection.filter((o) => o.publishLater).length;
+  if (pub) setTimeout(() => toast(`Tienes ${pub} observación${pub === 1 ? '' : 'es'} por publicar en iNaturalist (Colección).`), 3200);
+  if (route().name === 'coleccion') renderColeccion();
+}
+function renderOfflineBadge() {
+  const b = $('#btn-offline');
+  if (!b) return;
+  const z = loadZone();
+  b.classList.toggle('saved', zoneCovers(z, S.area, S.radius));
+  b.setAttribute('aria-label', z ? 'Mapa sin conexión: zona guardada' : 'Guardar esta zona para usarla sin conexión');
+  document.body.classList.toggle('is-offline', !navigator.onLine);
+}
+function renderZoneJob() {
+  const j = S.zoneJob;
+  const box = $('#zone-job');
+  if (!j || !box) return;
+  const pct = Math.round((j.done / Math.max(1, j.total)) * 100);
+  box.innerHTML = `<b>${esc(j.step)}</b><span class="xpbar" style="height:10px"><i style="width:${pct}%"></i></span><span class="muted" style="font-size:12px">${pct}% · ${nf(j.done)} de ${nf(j.total)} archivos${j.failed ? ` · ${nf(j.failed)} sin descargar` : ''}</span><button class="btn light" data-act="zone-cancel" style="height:40px;font-size:13px">Cancelar</button>`;
+}
+function openOfflineModal() {
+  const z = loadZone();
+  const covers = zoneCovers(z, S.area, S.radius);
+  const plan = S.species.length && !S.offline ? zonePlan() : null;
+  const pend = S.collection.filter((o) => o.pendingSync).length;
+  const when = z ? new Date(z.at).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+  openModal(`<div class="top"><h2>Mapa sin conexión</h2><button class="x" data-act="modal-close" aria-label="Cerrar">${I.x}</button></div>
+    <div class="off-state ${navigator.onLine ? 'on' : 'off'}"><i></i>${navigator.onLine ? 'Con conexión' : 'Sin conexión · usando la zona guardada'}</div>
+    <p class="muted" style="margin:0;font-size:13px;line-height:1.5">Guarda el mapa del radio elegido antes de salir a terreno. En cerros y montañas sin señal, el GPS del teléfono sigue funcionando: la app ubica tus capturas y registros sobre el mapa guardado y los verifica con iNaturalist y GBIF cuando vuelva la conexión.</p>
+    ${z ? `<div class="zone-card"><b>Zona guardada</b><span>${esc(z.label || '')} · radio ${z.radius} km</span><span>${nf(z.species.length)} especies · ${nf(z.points.length)} registros · ${nf(z.tiles)} partes del mapa (hasta zoom ${z.zMax}) · ${z.mb} MB</span><span class="muted">Guardada el ${esc(when)}${covers ? ' · cubre tu radio actual' : ' · no cubre tu radio actual'}</span>
+      <div class="two"><button class="btn light" data-act="zone-goto" style="height:40px;font-size:13px">Ver en el mapa</button><button class="btn light" data-act="zone-delete" style="height:40px;font-size:13px">Borrar</button></div></div>` : ''}
+    <div id="zone-job" class="zone-job"></div>
+    ${S.zoneJob ? '' : navigator.onLine && plan ? `<button class="btn" data-act="zone-save">${I.dl}${z ? 'Reemplazar por' : 'Guardar'} esta zona · ${S.radius} km (≈ ${plan.mb} MB)</button>
+      <span class="muted" style="font-size:12px;text-align:center">Incluye ${nf(S.species.length)} especies, sus registros, ${nf(plan.photos.length)} fotos y el mapa ${plan.layer === 'topo' ? 'topográfico' : 'satelital'} hasta zoom ${plan.zMax}.</span>`
+      : navigator.onLine ? '<span class="muted" style="font-size:13px">Espera a que carguen las especies para guardar la zona.</span>' : ''}
+    ${pend ? `<div class="note">${nf(pend)} observación${pend === 1 ? '' : 'es'} hecha${pend === 1 ? '' : 's'} sin conexión por verificar.${navigator.onLine ? ' <button class="chip-btn" data-act="zone-sync">Verificar ahora</button>' : ' Se verificarán al volver la señal.'}</div>` : ''}`);
+  renderZoneJob();
+}
+window.addEventListener('online', () => {
+  renderOfflineBadge(); renderRadii();
+  toast('Conexión recuperada.');
+  if (S.offline) { cache.clear(); loadArea(); }
+  syncPending();
+});
+window.addEventListener('offline', () => {
+  renderOfflineBadge(); renderRadii();
+  toast(loadZone() ? 'Sin conexión · usando la zona guardada.' : 'Sin conexión. Guarda una zona para usar el mapa sin señal.');
+});
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
 /* ---------- barra inferior configurable ---------- */
 const TAB_NAMES = { mapa: 'Mapa', especies: 'Especies', nuevo: 'Registrar', coleccion: 'Colección' };
 function applyTabs() {
@@ -1512,6 +1722,12 @@ document.addEventListener('click', async (e) => {
     case 'tabs-hide': setTabsHidden(true); break;
     case 'tabs-show': setTabsHidden(false); break;
     case 'tabs-config': openTabsConfig(); break;
+    case 'offline': openOfflineModal(); break;
+    case 'zone-save': downloadZone(); openOfflineModal(); break;
+    case 'zone-cancel': if (S.zoneJob) S.zoneJob.cancel = true; break;
+    case 'zone-delete': deleteZone(); break;
+    case 'zone-sync': closeModal(); syncPending(); break;
+    case 'zone-goto': { const z = loadZone(); closeModal(); if (z && map) { location.hash = '#mapa'; map.flyTo([z.area.lat, z.area.lng], 13); } break; }
     case 'sort-az': setSort('az'); break;
     case 'sort-dist': setSort('dist'); break;
     case 'mq-all': S.q = $('#mq').value; hideMapSearch(); location.hash = '#especies'; setTimeout(() => { const q = $('#q'); if (q) q.value = S.q; renderEspecies(); }, 60); break;
@@ -1533,7 +1749,7 @@ document.addEventListener('click', async (e) => {
     case 'nv-loc-avatar': Object.assign(S.nuevo, { lat: S.pos.lat, lng: S.pos.lng, acc: null }); nuevoClassify(); break;
     case 'nv-loc-gps':
       if (!navigator.geolocation) { toast('Este navegador no permite GPS.'); break; }
-      navigator.geolocation.getCurrentPosition((p) => { Object.assign(S.nuevo, { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy }); nuevoClassify(); }, () => toast('No se pudo obtener tu ubicación.'), { enableHighAccuracy: true, timeout: 10000 });
+      navigator.geolocation.getCurrentPosition((p) => { Object.assign(S.nuevo, { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy }); nuevoClassify(); }, () => toast('No se pudo obtener tu ubicación.'), { enableHighAccuracy: true, timeout: navigator.onLine ? 10000 : 25000 });
       break;
     case 'nv-save': nuevoSave(); break;
     case 'nv-reset': S.nuevo = null; renderNuevo(); break;
@@ -1568,7 +1784,7 @@ function locate() {
     setPos(p.coords.latitude, p.coords.longitude, `±${Math.round(p.coords.accuracy)} m`);
     stopWatch();
     watchId = navigator.geolocation.watchPosition((w) => { if (!settings.demo) movePlayer(w.coords.latitude, w.coords.longitude, true); }, () => {}, { enableHighAccuracy: true, maximumAge: 3000 });
-  }, () => toast('No se pudo obtener tu ubicación. Sigues en la ubicación de prueba.'), { enableHighAccuracy: true, timeout: 10000 });
+  }, () => toast('No se pudo obtener tu ubicación. Sigues en la ubicación de prueba.'), { enableHighAccuracy: true, timeout: navigator.onLine ? 10000 : 25000 });
 }
 $('#btn-locate').addEventListener('click', locate);
 $('#btn-ajustes').addEventListener('click', openSettings);
@@ -1588,5 +1804,6 @@ window.addEventListener('hashchange', show);
 
 renderHud();
 applyTabs();
+renderOfflineBadge();
 show();
 loadArea();
