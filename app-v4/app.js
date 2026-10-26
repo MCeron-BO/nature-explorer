@@ -7,6 +7,8 @@ const PLANTAE = 47126;
 const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
+// Versión visible en la pantalla de inicio; se actualiza en cada publicación.
+const APP_VERSION = '1.0.0';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -686,6 +688,7 @@ async function renderInicio() {
         <span class="go">${I.right}</span></${off ? 'div' : 'a'}>`;
     el.innerHTML = `<div class="home">
       ${mountains}
+      <span class="app-ver">Versión ${APP_VERSION}</span>
       <header class="home-head">
         <span class="logo-leaf xl" aria-hidden="true"></span>
         <h1>Nature Explorer</h1>
