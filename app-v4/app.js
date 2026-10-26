@@ -570,8 +570,8 @@ function drawSelLine() {
   const d = fmtDist(dist(S.pos, p));
   if (!selLine) {
     selLine = L.layerGroup([
-      L.polyline(ll, { color: '#0F2A1C', weight: 7, opacity: 0.45, interactive: false }),
-      L.polyline(ll, { color: '#B8F24A', weight: 4, dashArray: '10 8', lineCap: 'round', interactive: false, className: 'sel-line' })
+      L.polyline(ll, { color: '#FFFFFF', weight: 8, opacity: 0.85, interactive: false }),
+      L.polyline(ll, { color: '#E0201B', weight: 5, dashArray: '10 8', lineCap: 'round', interactive: false, className: 'sel-line' })
     ]).addTo(map);
     selLine.getLayers()[1].bindTooltip(d, { permanent: true, direction: 'center', className: 'sel-dist' });
   } else {
