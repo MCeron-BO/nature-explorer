@@ -335,6 +335,7 @@ async function loadArea() {
   }
   S.loading = false;
   S.band = null;
+  if (S.sim) addSimPoints();
   renderSheet(); renderPoints(); renderNear(); renderEspecies();
   radarCheck(true);
   renderOfflineBadge();
@@ -530,6 +531,7 @@ function renderPoints() {
     if (!cur || d < cur.d) best.set(p.sp, { p, d });
   }
   const iconSet = new Set([...best.values()].sort((a, b) => a.d - b.d).slice(0, MAX_ICONS).map((x) => x.p));
+  for (const p of S.points) if (p.sim) iconSet.add(p);
   for (const p of S.points) {
     if (!p.sp || iconSet.has(p)) continue;
     const r = rarity(p.sp);
@@ -542,8 +544,8 @@ function renderPoints() {
     const img = p.sp.photo ? `background-image:url('${esc(p.sp.photo)}')` : '';
     const m = L.marker([p.lat, p.lng], {
       // Pin tipo gota con la foto de la especie, como en el prototipo; la punta marca el registro.
-      icon: L.divIcon({ className: '', html: `<div class="pin" style="--rc:${r.color}"><div class="pm" style="${img}">${p.sp.photo ? '' : '🌿'}</div></div>`, iconSize: [40, 48], iconAnchor: [20, 48] }),
-      zIndexOffset: r.stars * 100,
+      icon: L.divIcon({ className: '', html: `<div class="pin ${p.sim ? 'sim' : ''}" style="--rc:${r.color}"><div class="pm" style="${img}">${p.sp.photo ? '' : '🌿'}</div>${p.sim ? '<b class="sim-tag">DEMO</b>' : ''}</div>`, iconSize: [40, 48], iconAnchor: [20, 48] }),
+      zIndexOffset: p.sim ? 1500 : r.stars * 100,
       title: p.sp.common || p.sp.sci,
       alt: p.sp.common || p.sp.sci,
       keyboard: true
@@ -1062,7 +1064,8 @@ function startCapture(id, d) {
   const sp = findSp(id);
   if (!sp) return;
   const p = S.points.filter((x) => x.sp === sp).sort((a, b) => dist(S.pos, a) - dist(S.pos, b))[0];
-  S.capture = { sp, step: 'carta', d: d ?? (p ? dist(S.pos, p) : sp.dist), uid: `c${Date.now()}` };
+  const sim = !!S.sim && S.points.some((x) => x.sim && x.sp === sp);
+  S.capture = { sp, step: 'carta', d: d ?? (p ? dist(S.pos, p) : sp.dist), uid: `c${Date.now()}`, sim };
   selectPoint(null);
   location.hash = '#captura';
 }
@@ -1095,7 +1098,7 @@ function renderCaptura() {
         <div class="stats"><div><b>${fmtDist(c.d)}</b><span>Distancia</span></div><div><b>${nf(sp.inatCount + sp.gbifCount)}</b><span>Registros</span></div><div><b>+${reward}</b><span>XP</span></div></div>
         ${rarityWhy(sp) ? `<div class="why" style="margin:6px 4px 2px">${rarityWhy(sp)}</div>` : ''}
       </div>
-      <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px;align-items:center"><button class="btn mint" data-step="capturada" style="height:60px;font-size:20px;letter-spacing:.06em">Capturar</button><span style="font-size:13px;color:#BFCFC4;font-weight:700">Estás a ${fmtDist(c.d)} de un registro real</span></div></div>`;
+      <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px;align-items:center"><button class="btn mint" data-step="capturada" style="height:60px;font-size:20px;letter-spacing:.06em">Capturar</button><span style="font-size:13px;color:#BFCFC4;font-weight:700">${c.sim ? `Planta simulada (DEMO) a ${fmtDist(c.d)}` : `Estás a ${fmtDist(c.d)} de un registro real`}</span></div></div>`;
   } else if (c.step === 'capturada') {
     if (!c.saved) {
       c.saved = true;
@@ -1121,7 +1124,8 @@ function renderCaptura() {
     el.innerHTML = `<div class="camera"><div class="view" style="${c.preview ? `background-image:url('${c.preview}')` : ''}">
       <div class="minicard">${thumb(sp.photo, 'sm')}<div style="display:flex;flex-direction:column"><b style="font-size:14px">${esc(sp.common || sp.sci)}</b><span class="sci" style="font-size:13px;color:var(--ink2)">${esc(sp.sci)}</span></div></div>
       <button class="fab round" data-step="validar" style="position:absolute;top:14px;right:14px;background:rgba(0,0,0,.5);color:#fff" aria-label="Cerrar cámara">${I.x}</button>
-      <div class="hint">Busca la planta a tu alrededor y toma una fotografía para validar la observación.</div></div>
+      <div class="hint">Busca la planta a tu alrededor y toma una fotografía para validar la observación.</div>
+      ${c.sim ? '<button class="sim-shot" data-act="sim-photo">DEMO · Simular foto y validación</button>' : ''}</div>
       <div class="controls"><label class="cam-btn" aria-label="Elegir de la galería">${I.img}<input type="file" accept="image/*" class="sr" data-photo-input="capture"></label>
       <label class="shutter" aria-label="Tomar fotografía"><i></i><input type="file" accept="image/*" capture="environment" class="sr" data-photo-input="capture"></label><span style="width:48px"></span></div></div>`;
   } else if (c.step === 'ia') {
@@ -1197,7 +1201,9 @@ async function confirmCapture() {
   const t = c.matches[c.pick].taxon;
   c.confirming = true; renderCaptura();
   try {
-    c.result = await classify(t);
+    // En DEMO la validación se simula: la especie queda confirmada con los registros reales que tiene en la zona.
+    if (c.simShot) { await new Promise((r) => setTimeout(r, 900)); c.result = { status: 'validada', near: Math.max(1, (c.sp.inatCount || 0) + (c.sp.gbifCount || 0)), sim: true }; }
+    else c.result = await classify(t);
   } catch (e) {
     console.error(e);
     c.confirming = false; renderCaptura();
@@ -1207,12 +1213,104 @@ async function confirmCapture() {
   c.confirming = false;
   if (S.capture !== c) return;
   const prevEntry = S.collection.find((o) => o.uid === c.uid);
-  addToCollection(Object.assign({}, prevEntry, { uid: c.uid, id: String(t.id), taxonId: t.id, sci: t.name, common: cap(t.preferred_common_name), photo: photoUrl(t.default_photo, 'square') || c.sp.photo, userPhoto: c.preview, status: c.result.status, conf: c.matches[c.pick].pct, date: today(), lat: S.pos.lat, lng: S.pos.lng, kind: 'captura', pendingSync: !!c.result.offline }));
+  addToCollection(Object.assign({}, prevEntry, { uid: c.uid, id: String(t.id), taxonId: t.id, sci: t.name, common: cap(t.preferred_common_name), photo: photoUrl(t.default_photo, 'square') || c.sp.photo, userPhoto: c.preview, status: c.result.status, conf: c.matches[c.pick].pct, date: today(), lat: S.pos.lat, lng: S.pos.lng, kind: 'captura', pendingSync: !!c.result.offline, sim: !!c.simShot }));
   c.xp = STATUS_XP[c.result.status] || 0;
   c.step = 'resultado'; renderCaptura();
   sfx(c.result.status === 'validada' ? 'badge' : 'levelup');
   setTimeout(() => addXP(c.xp, 'validación'), 600);
   checkBadges(null);
+}
+
+/* ---------- DEMO: plantas simuladas cerca ---------- */
+// Pone especies reales de la zona a pocos metros de tu avatar para probar la captura y la validación sin caminar.
+const SIM_N = 6;
+function addSimPoints() {
+  S.points = S.points.filter((p) => !p.sim);
+  const pool = S.species.filter((s) => s.photo && s.inatId);
+  if (!pool.length) return 0;
+  // Mezcla rarezas: algunas de las más raras y luego las más comunes.
+  const picks = [...pool].sort((a, b) => rarity(b).stars - rarity(a).stars).slice(0, 2)
+    .concat([...pool].sort((a, b) => b.inatCount - a.inatCount).slice(0, SIM_N))
+    .filter((s, i, a) => a.indexOf(s) === i).slice(0, SIM_N);
+  const lat0 = S.pos.lat, lng0 = S.pos.lng, mLat = 111320, mLng = 111320 * Math.cos(lat0 * Math.PI / 180);
+  // Las primeras quedan dentro de la distancia de captura; las dos últimas un poco más lejos para probar el radar.
+  const cap = settings.capture;
+  picks.forEach((sp, i) => {
+    const d = i < picks.length - 2 ? cap * (0.3 + 0.15 * i) : cap * (1.8 + (i - picks.length + 2) * 0.8);
+    const a = (i / picks.length) * Math.PI * 2 + 0.4;
+    S.points.push({ src: 'sim', sim: true, sp, k: key2(sp.sci), lat: lat0 + (Math.sin(a) * d) / mLat, lng: lng0 + (Math.cos(a) * d) / mLng });
+  });
+  return picks.length;
+}
+function toggleSim() {
+  if (!S.sim && S.loading) { toast('Espera a que carguen las plantas de la zona.'); return; }
+  S.sim = !S.sim;
+  if (S.sim) {
+    const n = addSimPoints();
+    if (!n) { S.sim = false; toast('No hay especies con foto en esta zona para simular.'); return; }
+    toast(`DEMO: ${n} plantas simuladas alrededor de tu avatar. Toca una para capturarla.`);
+    sfx('pop');
+  } else {
+    S.points = S.points.filter((p) => !p.sim);
+    if (S.selected?.sim) S.selected = null;
+    toast('DEMO desactivado.');
+  }
+  renderSim(); renderPoints(); renderNear(); radarCheck(true);
+}
+function renderSim() {
+  const b = $('#btn-sim');
+  if (!b) return;
+  b.classList.toggle('on', !!S.sim);
+  b.setAttribute('aria-pressed', S.sim ? 'true' : 'false');
+}
+// Simula la foto de validación con la imagen de la especie y una identificación de la IA.
+async function simCapturePhoto() {
+  const c = S.capture;
+  if (!c) return;
+  const run = (c.run = (c.run || 0) + 1);
+  const alive = () => S.capture === c && c.run === run;
+  const sp = c.sp;
+  c.simShot = true; c.file = null; c.error = null; c.criteria = null; c.matches = null; c.pick = 0;
+  c.preview = sp.photoM || sp.photo; c.step = 'ia'; c.analyzing = true;
+  for (const st of ['Preparando la foto (DEMO)…', 'Reconociendo la planta en tu foto (simulado)…', 'Comparando distribución, época del año y registros cercanos…']) {
+    c.stage = st;
+    if (alive() && route().name === 'captura') renderCaptura();
+    await new Promise((r) => setTimeout(r, 750));
+    if (!alive()) return;
+  }
+  const asTaxon = (s) => ({ id: s.inatId, name: s.sci, preferred_common_name: s.common, default_photo: { square_url: s.photo } });
+  const alt = S.species.filter((s) => s !== sp && s.inatId && s.photo).slice(0, 2);
+  const pct = 88 + Math.floor(Math.random() * 10);
+  c.matches = [{ taxon: asTaxon(sp), pct, note: 'DEMO' }, ...alt.map((s, i) => ({ taxon: asTaxon(s), pct: i ? 1 : Math.max(1, 98 - pct) }))];
+  c.usedAI = true;
+  const rec = (sp.inatCount || 0) + (sp.gbifCount || 0);
+  c.criteria = [
+    { ok: true, label: 'Fotografía del usuario', d: 'Simulada (DEMO)' },
+    { ok: true, label: 'Distribución geográfica', d: `${nf(rec)} registros reales en la zona` },
+    { ok: true, label: 'Época del año', d: 'Simulado (DEMO)' },
+    { ok: true, label: 'Registros cercanos', d: 'Planta simulada junto a tu avatar' },
+    { ok: true, label: 'Catálogo taxonómico', d: 'iNaturalist · GBIF Backbone' }
+  ];
+  c.analyzing = false;
+  if (alive() && route().name === 'captura') renderCaptura();
+}
+
+/* ---------- banner de publicidad ---------- */
+// Franja delgada sobre la barra inferior; los avisos se desplazan solos y se puede cerrar durante la sesión.
+// Para usar los logos oficiales, pon el archivo en `img` (por ejemplo 'img/bancochile.png').
+const ADS = [
+  { name: 'Banco de Chile', tag: 'Apoya la ciencia ciudadana', color: '#002D72', accent: '#FFFFFF', img: '' },
+  { name: 'CORFO', tag: 'Impulsa la innovación en Chile', color: '#E1251B', accent: '#FFFFFF', img: '' }
+];
+function renderAd() {
+  const el = $('#ad-banner');
+  if (!el) return;
+  let off = false;
+  try { off = sessionStorage.getItem('nx4.adOff') === '1'; } catch { /* sin almacenamiento */ }
+  $('#phone').classList.toggle('ad-off', off);
+  const item = (a) => `<span class="ad-item">${a.img ? `<img src="${esc(a.img)}" alt="${esc(a.name)}">` : `<span class="ad-logo" style="--ab:${a.color};--af:${a.accent}">${esc(a.name)}</span>`}<span class="ad-tag">${esc(a.tag)}</span></span>`;
+  const run = ADS.map(item).join('');
+  el.innerHTML = `<span class="ad-label">Publicidad</span><div class="ad-track" aria-hidden="true"><div class="ad-run">${run}${run}${run}${run}</div></div><span class="sr">Publicidad: ${ADS.map((a) => a.name).join(' y ')}</span><button class="ad-x" data-act="ad-close" aria-label="Cerrar publicidad">${I.x}</button>`;
 }
 
 /* ---------- nuevo registro ---------- */
@@ -1450,7 +1548,7 @@ function renderColeccion() {
       ${S.loading ? '<div class="state"><div class="spinner"></div></div>' : `<div class="grid3">${targets.map((s) => got.has(s.inatId)
         ? `<a class="cc" href="#ficha/${esc(s.id)}" style="--rc:${rarity(s).color}"><div class="ph" style="background-image:url('${esc(s.photoM)}')"><span class="ok">${I.check}</span></div><div class="t"><b>${esc(s.common || s.sci)}</b><span style="font-size:11px;font-weight:800;color:var(--ink2)">${stars(rarity(s))}</span></div></a>`
         : `<a class="cc lock" href="#ficha/${esc(s.id)}"><div class="ph" style="background-image:url('${esc(s.photo)}')"><span class="lk">❓</span></div><div class="t"><b style="color:var(--muted)">${esc(s.common || s.sci)}</b><span class="muted" style="font-size:11px;font-weight:700">a ${fmtDist(s.dist)}</span></div></a>`).join('')}</div>`}`
-    : (col.length ? groups.map(([st, title, color]) => { const items = by(st); return items.length ? `<section style="margin-bottom:16px"><div style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:${color}"></span><b>${title}</b><span class="muted">${items.length}</span></div>${items.map((o) => `<div class="sp">${thumb(o.userPhoto || o.photo, 'sm')}<div class="info"><span style="font-weight:600">${esc(o.common || o.sci)}</span><span class="sci">${esc(o.sci)}</span><span class="muted" style="font-size:12px">${esc(o.date)}${o.conf != null ? ` · ${o.conf} % IA` : ''} · ${o.kind === 'nuevo' ? 'nuevo registro' : 'captura'}${o.pendingSync ? ' · por verificar' : ''}</span></div>${st === 'pendiente' ? `<button class="btn" style="height:36px;width:auto;font-size:13px;border-radius:999px" data-revalidate="${esc(o.uid)}">Validar</button>` : `<button class="x" aria-label="Eliminar" data-del="${esc(o.uid)}">${I.x}</button>`}</div>`).join('')}</section>` : ''; }).join('')
+    : (col.length ? groups.map(([st, title, color]) => { const items = by(st); return items.length ? `<section style="margin-bottom:16px"><div style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:${color}"></span><b>${title}</b><span class="muted">${items.length}</span></div>${items.map((o) => `<div class="sp">${thumb(o.userPhoto || o.photo, 'sm')}<div class="info"><span style="font-weight:600">${esc(o.common || o.sci)}</span><span class="sci">${esc(o.sci)}</span><span class="muted" style="font-size:12px">${esc(o.date)}${o.conf != null ? ` · ${o.conf} % IA` : ''} · ${o.kind === 'nuevo' ? 'nuevo registro' : 'captura'}${o.pendingSync ? ' · por verificar' : ''}${o.sim ? ' · DEMO' : ''}</span></div>${st === 'pendiente' ? `<button class="btn" style="height:36px;width:auto;font-size:13px;border-radius:999px" data-revalidate="${esc(o.uid)}">Validar</button>` : `<button class="x" aria-label="Eliminar" data-del="${esc(o.uid)}">${I.x}</button>`}</div>`).join('')}</section>` : ''; }).join('')
       : '<div class="state">Aún no tienes observaciones. Captura una especie desde el mapa.</div>')}</div>`;
 }
 
@@ -1748,6 +1846,7 @@ function show() {
   document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.dataset.screen === name));
   const full = ['inicio', 'captura'].includes(name);
   $('#tabbar').classList.toggle('hidden', full);
+  $('#phone').classList.toggle('ad-full', full);
   $('#tabs-show').hidden = full || !settings.tabsHidden;
   document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('full', full));
   if (name !== 'mapa') hideMapSearch();
@@ -1856,6 +1955,9 @@ document.addEventListener('click', async (e) => {
     case 'lp-me': pickerToMe(); break;
     case 'nv-save': nuevoSave(); break;
     case 'nv-reset': S.nuevo = null; renderNuevo(); break;
+    case 'sim': toggleSim(); break;
+    case 'sim-photo': simCapturePhoto(); break;
+    case 'ad-close': $('#phone').classList.add('ad-off'); try { sessionStorage.setItem('nx4.adOff', '1'); } catch { /* sin almacenamiento */ } break;
     case 'cap-retry': if (S.capture?.file) onCapturePhoto(S.capture.file); break;
     case 'use-demo': stopWatch(); settings.demo = true; refreshAvatar(); closeModal(); setPos(DEMO.lat, DEMO.lng, DEMO.label); break;
     case 'use-gps': closeModal(); locate(); break;
@@ -1911,6 +2013,7 @@ window.addEventListener('hashchange', show);
 
 renderHud();
 applyTabs();
+renderAd();
 renderOfflineBadge();
 show();
 loadArea();
