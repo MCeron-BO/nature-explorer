@@ -754,12 +754,11 @@ function renderEspecies() {
   const el = $('#s-especies');
   if (!el.dataset.ok) {
     el.dataset.ok = 1;
-    // Pantalla 3 del prototipo: título con volver, buscador con botón de filtros y barra de descarga abajo.
+    // Pantalla 3 del prototipo: título con volver, buscador con botón de filtros, orden y descarga arriba (abajo va la publicidad).
     el.innerHTML = `<div class="head">
       <div class="title-row"><a href="#mapa" class="icon-btn" aria-label="Volver al mapa">${I.back}</a><div style="flex:1;min-width:0"><h1>Flora del entorno</h1><span class="muted" style="font-size:13px" id="esp-sub"></span></div><button class="icon-btn" data-act="focus-q" aria-label="Buscar">${I.search}</button></div>
       <div class="search-row"><div class="search">${I.search}<label for="q" class="sr">Buscar especie por nombre común o científico</label><input id="q" type="search" placeholder="Buscar especie (nombre común o científico)…" autocomplete="off"></div><button class="icon-btn boxed" data-act="toggle-filters" aria-label="Filtros" id="btn-filters">${I.filter}</button></div>
-      <div class="filters" id="filters"></div><div id="esp-sort"></div></div><div class="scrollarea" id="esp-list"></div>
-      <div class="dlbar" id="dlbar"></div>`;
+      <div class="filters" id="filters"></div><div class="esp-tools"><div id="esp-sort"></div><button class="dl-mini" id="dl-btn" data-act="dl-toggle" aria-label="Descargar el listado de especies del entorno">${I.dl}<span>Descargar lista</span></button></div><div id="dl-panel"></div></div><div class="scrollarea" id="esp-list"></div>`;
     $('#q').addEventListener('input', (e) => { S.q = e.target.value; renderEspecies(); });
   }
   const fOn = S.showFilters || S.filter !== 'todas';
@@ -771,8 +770,9 @@ function renderEspecies() {
   $('#esp-sub').textContent = S.loading ? 'Cargando…' : `${nf(rows.length)} especies · Radio: ${S.radius} km`;
   $('#esp-sort').innerHTML = sortToggle();
   const FM = [['xlsx', 'Excel', '(.xlsx)', '#1D7A45'], ['csv', 'CSV', '(.csv)', '#5B6B64'], ['pdf', 'PDF', '(.pdf)', '#C2412D'], ['kml', 'KML', '(.kml)', '#2A6FB5'], ['kmz', 'KMZ', '(.kmz)', '#6B4FB0']];
-  $('#dlbar').innerHTML = `<button class="dl-toggle" data-act="dl-toggle" aria-expanded="${!!S.dlOpen}">${I.dl}<span>Descargar listado del entorno</span>${S.dlOpen ? I.down : I.up}</button>
-    ${S.dlOpen ? `<div class="dl-tiles">${FM.map(([id, l, e, c]) => `<button data-dl="${id}" aria-label="Descargar en ${l}"><i style="background:${c}">${l[0]}</i><b>${l}</b><span>${e}</span></button>`).join('')}</div>` : ''}`;
+  $('#dl-btn').classList.toggle('on', !!S.dlOpen);
+  $('#dl-btn').setAttribute('aria-expanded', S.dlOpen ? 'true' : 'false');
+  $('#dl-panel').innerHTML = `${S.dlOpen ? `<div class="dl-pop"><span>Lista de ${nf(rows.length)} especies en ${S.radius} km · elige el formato</span><div class="dl-tiles">${FM.map(([id, l, e, c]) => `<button data-dl="${id}" aria-label="Descargar en ${l}"><i style="background:${c}">${l[0]}</i><b>${l}</b><span>${e}</span></button>`).join('')}</div></div>` : ''}`;
   const list = $('#esp-list');
   if (S.loading) list.innerHTML = '<div class="state"><div class="spinner"></div>Consultando GBIF e iNaturalist…</div>';
   else if (S.error) list.innerHTML = `<div class="state">${esc(S.error)}</div>`;

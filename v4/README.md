@@ -16,7 +16,7 @@ Abre http://localhost:5176
 |---|---|
 | 1 · Selección de reino | Logo de hojas centrado, «¿Qué quieres explorar hoy?», paisaje de montañas de fondo, tres tarjetas horizontales (foto, ícono, nombre, descripción y flecha) y la frase «Un mundo por descubrir». Fauna y Hongos siguen como *Próximamente*. |
 | 2 · Mapa (Flora) | Cabecera blanca con logo «Nature Explorer · Flora» y engranaje de ajustes; tarjeta «Radio de búsqueda» con botones segmentados; pines tipo gota con la foto de cada especie; botones redondos de ubicación y capas; botones grandes **Capturar** y **Nuevo Registro**; escala del mapa; panel con «N especies de plantas en un radio de X km» y 4 cifras (Nativas, Endémicas, Amenazadas, Registros). |
-| 3 · Listado de especies | «Flora del entorno» con volver y lupa; buscador con botón de filtros; filas con foto, nombre, nombre científico, distancia, registros y flecha; barra verde **Descargar listado del entorno** que se despliega con Excel, CSV, PDF, KML y KMZ. |
+| 3 · Listado de especies | «Flora del entorno» con volver y lupa; buscador con botón de filtros; filas con foto, nombre, nombre científico, distancia, registros y flecha; botón pequeño **Descargar lista** arriba, junto al orden, que despliega Excel, CSV, PDF, KML y KMZ (abajo queda el banner de publicidad). |
 | 4 · Nuevo registro | Todo en una sola pantalla: foto principal con lápiz para cambiarla, miniaturas y «Agregar fotos» (cada vez se elige **Cámara** o **Galería**). Después de agregar fotos se abre un mapa que parte desde tu ubicación y **tú marcas el punto** donde las tomaste; cada foto guarda sus coordenadas y la observación usa las de la foto principal. Fecha y hora con **Editar**; «Identificar especie» parte en **Buscar en catálogo** y como segunda opción **Sugerir con IA**; aviso de resultado (por ejemplo «Posible nuevo registro local») y un botón **Guardar observación** grande, fijo al pie de la pantalla. |
 
 ## Cambios de navegación
@@ -29,7 +29,7 @@ Abre http://localhost:5176
 ## Modo DEMO y publicidad
 
 - **DEMO** (botón pequeño bajo los botones del mapa): pone 6 especies reales de la zona alrededor de tu avatar, 4 dentro de la distancia de captura y 2 un poco más lejos para probar el radar. Se marcan con la etiqueta «DEMO». Al capturarlas, la cámara ofrece **Simular foto y validación**: usa la foto de la especie, simula la IA y valida con los registros reales de la zona. Lo guardado queda marcado «DEMO» en la colección. Si se toma una foto real, la validación es la normal.
-- **Banner de publicidad**: franja de 30 px sobre la barra inferior con Banco de Chile y CORFO desplazándose; se oculta en el inicio y la captura y se puede cerrar con la X (vuelve en la próxima sesión). Los avisos están en `ADS` en `app.js`; para usar los logos oficiales, agrega el archivo y pon su ruta en `img`.
+- **Banner de publicidad**: franja de 30 px sobre la barra inferior con Banco de Chile y CORFO desplazándose; aparece en todas las pantallas (en el inicio y la captura, al pie) y se puede cerrar con la X (vuelve en la próxima sesión). Los avisos están en `ADS` en `app.js`; para usar los logos oficiales, agrega el archivo y pon su ruta en `img`.
 
 ## Uso sin conexión (cerros y montañas sin señal)
 
