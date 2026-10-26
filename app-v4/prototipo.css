@@ -435,3 +435,30 @@ body.is-offline .map-title span:not(.logo-leaf){color:#B23A2E;font-weight:800}
 @media (prefers-reduced-motion:reduce){.sel-line{animation:none}}
 .leaflet-tooltip.sel-dist{background:#E0201B;color:#fff;border:none;border-radius:999px;padding:3px 9px;font:700 12px var(--font,inherit);box-shadow:0 2px 6px rgba(0,0,0,.35)}
 .leaflet-tooltip.sel-dist::before{display:none}
+
+/* Botón DEMO: plantas simuladas cerca */
+.sim-btn{height:24px;min-width:40px;padding:0 6px;border-radius:999px;border:1.5px solid #fff;background:rgba(18,38,26,.78);color:#fff;font:800 10px var(--display);letter-spacing:.06em;box-shadow:0 2px 6px rgba(0,0,0,.3);align-self:center}
+.sim-btn.on{background:#F2C14E;color:#18261F;border-color:#18261F}
+.pin.sim .pm{box-shadow:0 0 0 2px #F2C14E,0 0 0 5px rgba(242,193,78,.45)}
+.sim-tag{position:absolute;left:50%;top:-11px;transform:translateX(-50%);z-index:2;background:#F2C14E;color:#18261F;font:800 8px/1 var(--display);letter-spacing:.05em;padding:2px 4px;border-radius:5px;border:1px solid #18261F}
+.sim-shot{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);border:2px solid #18261F;background:#F2C14E;color:#18261F;font:800 13px var(--display);padding:10px 14px;border-radius:999px;white-space:nowrap;box-shadow:0 3px 10px rgba(0,0,0,.35)}
+
+/* Banner de publicidad: franja delgada sobre la barra inferior */
+.ad-banner{position:absolute;left:0;right:0;bottom:64px;height:30px;z-index:890;display:flex;align-items:center;background:#F6F8F7;border-top:1px solid var(--line);overflow:hidden}
+#phone.tabs-off .ad-banner{bottom:0}
+#phone.ad-off .ad-banner,#phone.ad-full .ad-banner{display:none}
+#phone:not(.ad-off) .screen:not(.full){bottom:94px}
+#phone.tabs-off:not(.ad-off) .screen:not(.full){bottom:30px}
+#phone.tabs-off:not(.ad-off) .tabs-show{bottom:36px}
+.ad-label{flex:none;align-self:stretch;display:flex;align-items:center;padding:0 6px;font:700 8px var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);background:#F6F8F7;border-right:1px solid var(--line);z-index:1}
+.ad-track{flex:1;min-width:0;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 14px,#000 calc(100% - 14px),transparent);mask-image:linear-gradient(90deg,transparent,#000 14px,#000 calc(100% - 14px),transparent)}
+.ad-run{display:flex;width:max-content;animation:ad-move 22s linear infinite}
+.ad-banner:hover .ad-run{animation-play-state:paused}
+@keyframes ad-move{to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.ad-run{animation-duration:60s}}
+.ad-item{display:flex;align-items:center;gap:6px;padding:0 16px;white-space:nowrap}
+.ad-item img{height:20px;width:auto;display:block}
+.ad-logo{background:var(--ab);color:var(--af);font:800 11px/1 var(--display);padding:4px 7px;border-radius:5px;letter-spacing:.02em}
+.ad-tag{font-size:11px;font-weight:600;color:var(--ink2)}
+.ad-x{flex:none;width:28px;height:30px;border:none;background:transparent;color:var(--ink2);display:flex;align-items:center;justify-content:center;padding:0}
+.ad-x svg{width:13px;height:13px}

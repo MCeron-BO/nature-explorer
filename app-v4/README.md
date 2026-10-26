@@ -26,6 +26,11 @@ Abre http://localhost:5176
 - El nivel y el XP se ven en la pantalla de inicio, en Mis Observaciones y en Más.
 - El botón de capas alterna entre mapa **satelital** y **topográfico**.
 
+## Modo DEMO y publicidad
+
+- **DEMO** (botón pequeño bajo los botones del mapa): pone 6 especies reales de la zona alrededor de tu avatar, 4 dentro de la distancia de captura y 2 un poco más lejos para probar el radar. Se marcan con la etiqueta «DEMO». Al capturarlas, la cámara ofrece **Simular foto y validación**: usa la foto de la especie, simula la IA y valida con los registros reales de la zona. Lo guardado queda marcado «DEMO» en la colección. Si se toma una foto real, la validación es la normal.
+- **Banner de publicidad**: franja de 30 px sobre la barra inferior con Banco de Chile y CORFO desplazándose; se oculta en el inicio y la captura y se puede cerrar con la X (vuelve en la próxima sesión). Los avisos están en `ADS` en `app.js`; para usar los logos oficiales, agrega el archivo y pon su ruta en `img`.
+
 ## Uso sin conexión (cerros y montañas sin señal)
 
 1. **Antes de salir, con conexión:** en el mapa elige el radio y toca el botón de la nube (o **Más › Mapa sin conexión**) y luego **Guardar esta zona**. Se descargan:
