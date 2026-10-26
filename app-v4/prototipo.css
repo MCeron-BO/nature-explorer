@@ -499,3 +499,25 @@ body.is-offline .map-title span:not(.logo-leaf){color:#B23A2E;font-weight:800}
 .sum-go{flex:none;border:none;background:none;display:flex;align-items:center;gap:1px;min-height:36px;margin:-8px -8px -8px 0;padding:0 8px 0 10px;color:var(--g900);font-size:13px;font-weight:800;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
 .sum-go svg{width:15px;height:15px}
 .sum-go:active{opacity:.6}
+
+/* Nuevo registro: descartar, eliminar fotos y especies recientes */
+.nv-discard{flex:none;height:34px;padding:0 11px 0 9px;border-radius:999px;border:1px solid #E7B4AE;background:#FDF1EF;color:#B3261E;font:700 12px var(--display);display:flex;align-items:center;gap:4px}
+.nv-discard svg{width:16px;height:16px}
+.btn.nv-discard-b{color:#B3261E;height:40px;font-size:14px;gap:6px}
+.btn.nv-discard-b svg{width:17px;height:17px}
+.nv-edit-del{right:auto;left:10px;color:#B3261E}
+.nv-th{position:relative;aspect-ratio:1}
+.nv-th>button[data-nv-main]{width:100%;height:100%}
+.nv-strip .nv-del{aspect-ratio:auto;max-width:none;position:absolute;top:-6px;right:-6px;width:24px;height:24px;border-radius:999px;border:2px solid #fff;background:#B3261E;color:#fff;display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.nv-strip .nv-del svg{width:12px;height:12px;stroke-width:3}
+.nv-strip .nv-del::after{content:"";position:absolute;inset:-8px}
+.nv-recent{display:flex;flex-direction:column;gap:6px}
+.nv-recent-k{font-size:12px;font-weight:700;color:var(--ink2)}
+.nv-recent-row{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 6px;margin:0 -2px;scroll-snap-type:x proximity;scrollbar-width:none}
+.nv-recent-row::-webkit-scrollbar{display:none}
+.nv-recent-row button{flex:none;width:92px;scroll-snap-align:start;border:1px solid var(--line);border-radius:14px;background:#fff;padding:6px 6px 8px;display:flex;flex-direction:column;align-items:stretch;gap:3px;text-align:left;box-shadow:0 1px 3px rgba(23,36,29,.08)}
+.nv-recent-row .ph{position:relative;height:64px;border-radius:10px;background:#E3F3E8 center/cover no-repeat;display:flex;align-items:center;justify-content:center}
+.nv-recent-row .ph svg{width:30px;height:30px;color:#fff;background:rgba(15,42,28,.55);border-radius:999px;padding:4px;stroke-width:3}
+.nv-recent-row b{font-size:12px;line-height:1.2;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nv-recent-row i{font-size:10.5px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nv-recent-row button.on{border:2px solid var(--g900);background:var(--g50);padding:5px 5px 7px}
