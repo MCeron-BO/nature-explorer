@@ -639,22 +639,19 @@ function renderSheet() {
   const min = S.sheet === 'min';
   sh.classList.toggle('min', min);
   const title = S.loading ? 'Buscando especies…' : S.error ? 'No se pudieron cargar las especies' : `${nf(c.total)} especies de plantas`;
-  const sub = S.loading ? 'Consultando GBIF e iNaturalist' : S.error ? 'Revisa tu conexión' : S.offline ? `en ${S.radius} km · zona guardada sin conexión` : `en un radio de ${S.radius} km`;
+  const sub = S.loading ? 'Consultando GBIF e iNaturalist' : S.error ? 'Revisa tu conexión' : S.offline ? `en ${S.radius} km · zona guardada sin conexión` : `en un radio de ${S.radius} km · ${nf(S.species.reduce((a, s) => a + s.inatCount + s.gbifCount, 0))} registros`;
   const head = `<span class="grab" aria-hidden="true"></span><button class="sheet-head${min ? ' compact' : ''}" data-act="${min ? 'sheet-up' : open ? 'sheet' : 'sheet-min'}" aria-label="${min ? 'Mostrar resumen' : open ? 'Contraer lista' : 'Minimizar panel'}">
       <span class="logo-leaf sm" aria-hidden="true"></span><span class="t"><b>${title}</b><span>${sub}</span></span><span class="chev">${min ? I.up : I.down}</span></button>`;
   if (min) { sh.innerHTML = head; renderNear(); return; }
   let body;
   if (S.loading) body = '<div class="state" style="padding:10px"><div class="spinner"></div></div>';
   else if (S.error) body = `<div class="state" style="padding:10px">${esc(S.error)}<button class="btn light" data-act="reload" style="width:auto">Reintentar</button></div>`;
-  else body = `<div class="tiles4">
-      <div><i class="ic-g">${I.leaf}</i><b>${nf(c.native)}</b><span>Nativas</span></div>
-      <div><i class="ic-g">${I.flower}</i><b>${nf(c.endemic)}</b><span>Endémicas</span></div>
-      <div><i class="ic-r">${I.shield}</i><b>${nf(c.threatened)}</b><span>Amenazadas</span></div>
-      <div><i class="ic-g">${I.peaks}</i><b>${nf(S.species.reduce((a, s) => a + s.inatCount + s.gbifCount, 0))}</b><span>Registros</span></div>
-    </div>`;
+  // Resumen de solo lectura (texto en una línea, sin recuadros) para que no parezcan opciones que se tocan.
+  else body = `<div class="sum-line" role="group" aria-label="Resumen de la zona"><span class="sum-k">Resumen</span>
+      <span><b>${nf(c.native)}</b> nativas</span><span><b>${nf(c.endemic)}</b> endémicas</span><span class="r"><b>${nf(c.threatened)}</b> amenazadas</span></div>`;
   const list = open && !S.loading && !S.error
     ? `<div class="list"><div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0"><span class="over" style="color:var(--muted)">Las más cercanas</span><a href="#especies" style="font-size:13px;font-weight:700">Ver todas</a></div>${S.species.slice(0, 12).map(spRow).join('')}</div>`
-    : `<button class="sheet-more" data-act="sheet">Ver las más cercanas ${I.up}</button>`;
+    : `<button class="sheet-more" data-act="see-nearest">${I.leaf}<span>Ver las más cercanas</span>${I.right}</button>`;
   sh.innerHTML = `${head}${body}${S.loading || S.error ? '' : list}`;
   renderNear();
 }
@@ -1907,6 +1904,8 @@ document.addEventListener('click', async (e) => {
   }
   switch (d.act) {
     case 'sheet': setSheet(S.sheet === 'open' ? 'mid' : 'open'); break;
+    // Abre directo el listado completo (buscador, filtros, descarga) ordenado por cercanía.
+    case 'see-nearest': if (settings.sort !== 'dist') { settings.sort = 'dist'; saveSettings(); } location.hash = '#especies'; break;
     case 'sheet-up': setSheet('mid'); break;
     case 'sheet-min': setSheet('min'); break;
     case 'near-close': selectPoint(null); break;
