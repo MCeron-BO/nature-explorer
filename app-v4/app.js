@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.0.1';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -133,7 +133,10 @@ const thumb = (url, cls = '') => `<div class="thumb ${cls}" style="${url ? `back
 
 /* ---------- estado ---------- */
 // La v4 usa claves propias (nx4.*) para no mezclar datos con las otras versiones en el mismo dominio.
-const settings = Object.assign({ demo: true, lat: DEMO.lat, lng: DEMO.lng, label: DEMO.label, radius: 5, capture: 50, token: '', avatar: '🧑', sound: true, tabsHidden: false }, ls.get('nx4.settings', {}));
+const settings = Object.assign({ demo: true, lat: DEMO.lat, lng: DEMO.lng, label: DEMO.label, radius: 5, capture: 50, token: '', avatar: '🧑', sound: true, tabsHidden: false, recentN: 3 }, ls.get('nx4.settings', {}));
+// Especies recientes que se muestran en Nuevo registro: entre 3 y 6 (por defecto 3).
+const RECENT_MIN = 3, RECENT_MAX = 6;
+const recentN = () => Math.min(RECENT_MAX, Math.max(RECENT_MIN, Math.round(Number(settings.recentN)) || RECENT_MIN));
 // Qué opciones muestra la barra inferior; «Más» siempre queda, porque desde ahí se vuelven a activar.
 settings.tabs = Object.assign({ mapa: true, especies: true, nuevo: true, coleccion: true }, settings.tabs);
 // El zorro ya no existe como avatar: quien lo tenía guardado pasa a la persona.
@@ -1401,7 +1404,7 @@ function recentTaxa() {
     if (!o.taxonId || seen.has(o.taxonId)) continue;
     seen.add(o.taxonId);
     out.push({ id: o.taxonId, name: o.sci, preferred_common_name: o.common, default_photo: { square_url: o.photo || o.userPhoto } });
-    if (out.length === 10) break;
+    if (out.length === recentN()) break;
   }
   return out;
 }
@@ -1603,6 +1606,7 @@ function openSettings() {
       <span class="muted" style="font-size:12px">También puedes mover el mapa y tocar el botón de alfiler para explorar cualquier lugar.</span></div>
     <label class="mini" style="cursor:pointer"><input type="checkbox" id="snd" ${settings.sound !== false ? 'checked' : ''} style="width:22px;height:22px;accent-color:var(--g900)"><span class="info"><b style="font-size:15px">Sonidos y vibración</b><span class="muted" style="font-size:13px">Radar de cercanía, capturas, XP y logros</span></span></label>
     <button class="btn light" data-act="profile">${settings.avatar} Cambiar avatar y ver logros</button>
+    <div class="field"><label for="rec-n">Especies recientes en Nuevo registro</label><select id="rec-n">${Array.from({ length: RECENT_MAX - RECENT_MIN + 1 }, (_, i) => RECENT_MIN + i).map((k) => `<option value="${k}" ${recentN() === k ? 'selected' : ''}>${k} especies</option>`).join('')}</select><span class="muted" style="font-size:12px">Accesos rápidos para elegir la especie sin buscarla (mínimo ${RECENT_MIN}, máximo ${RECENT_MAX}).</span></div>
     <div class="field"><label for="cap-m">Qué tan cerca debes estar para capturar</label><select id="cap-m">${[20, 50, 100, 250].map((m) => `<option value="${m}" ${settings.capture === m ? 'selected' : ''}>${m} m</option>`).join('')}</select></div>
     <div class="field"><label for="tok">Token de API de iNaturalist (opcional)</label><input id="tok" type="password" autocomplete="off" value="${esc(settings.token)}" placeholder="Activa la identificación visual con IA">
       <span class="muted" style="font-size:12px;line-height:1.5">Obténlo con tu cuenta en <a href="https://www.inaturalist.org/users/api_token" target="_blank" rel="noopener">inaturalist.org/users/api_token</a>. Dura 24 h y solo se guarda en este navegador.</span></div>
@@ -2016,7 +2020,7 @@ document.addEventListener('click', async (e) => {
     case 'cap-retry': if (S.capture?.file) onCapturePhoto(S.capture.file); break;
     case 'use-demo': stopWatch(); settings.demo = true; refreshAvatar(); closeModal(); setPos(DEMO.lat, DEMO.lng, DEMO.label); break;
     case 'use-gps': closeModal(); locate(); break;
-    case 'settings-save': settings.token = $('#tok').value.trim(); settings.capture = Number($('#cap-m').value); settings.sound = $('#snd').checked; saveSettings(); closeModal(); renderNear(); toast('Ajustes guardados'); break;
+    case 'settings-save': settings.token = $('#tok').value.trim(); settings.capture = Number($('#cap-m').value); settings.recentN = Number($('#rec-n').value); settings.sound = $('#snd').checked; saveSettings(); closeModal(); renderNear(); if (route().name === 'nuevo') renderNuevo(); toast('Ajustes guardados'); break;
   }
 });
 document.addEventListener('change', (e) => {
