@@ -29,7 +29,7 @@ Abre http://localhost:5176
 ## Modo DEMO y publicidad
 
 - **DEMO** (botón pequeño bajo los botones del mapa): pone 6 especies reales de la zona alrededor de tu avatar, 4 dentro de la distancia de captura y 2 un poco más lejos para probar el radar. Se marcan con la etiqueta «DEMO». Al capturarlas, la cámara ofrece **Simular foto y validación**: usa la foto de la especie, simula la IA y valida con los registros reales de la zona. Lo guardado queda marcado «DEMO» en la colección. Si se toma una foto real, la validación es la normal.
-- **Banner de publicidad**: franja de 30 px sobre la barra inferior con Banco de Chile y CORFO desplazándose; aparece en todas las pantallas (en el inicio y la captura, al pie) y se puede cerrar con la X (vuelve en la próxima sesión). Los avisos están en `ADS` en `app.js`; para usar los logos oficiales, agrega el archivo y pon su ruta en `img`.
+- **Banner de publicidad**: franja de 30 px sobre la barra inferior con Banco de Chile y CORFO desplazándose; aparece en todas las pantallas (en el inicio y la captura, al pie) y se puede cerrar con la X: vuelve a aparecer a los 10 segundos. Los avisos están en `ADS` en `app.js`; para usar los logos oficiales, agrega el archivo y pon su ruta en `img`.
 
 ## Uso sin conexión (cerros y montañas sin señal)
 

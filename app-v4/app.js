@@ -1295,18 +1295,23 @@ async function simCapturePhoto() {
 }
 
 /* ---------- banner de publicidad ---------- */
-// Franja delgada sobre la barra inferior; los avisos se desplazan solos y se puede cerrar durante la sesión.
+// Franja delgada sobre la barra inferior; los avisos se desplazan solos. Si se cierra, vuelve a aparecer a los 10 s.
 // Para usar los logos oficiales, pon el archivo en `img` (por ejemplo 'img/bancochile.png').
 const ADS = [
   { name: 'Banco de Chile', tag: 'Apoya la ciencia ciudadana', color: '#002D72', accent: '#FFFFFF', img: '' },
   { name: 'CORFO', tag: 'Impulsa la innovación en Chile', color: '#E1251B', accent: '#FFFFFF', img: '' }
 ];
+const AD_BACK_MS = 10000;
+let adT;
+function closeAd() {
+  $('#phone').classList.add('ad-off');
+  clearTimeout(adT);
+  adT = setTimeout(() => $('#phone').classList.remove('ad-off'), AD_BACK_MS);
+}
 function renderAd() {
   const el = $('#ad-banner');
   if (!el) return;
-  let off = false;
-  try { off = sessionStorage.getItem('nx4.adOff') === '1'; } catch { /* sin almacenamiento */ }
-  $('#phone').classList.toggle('ad-off', off);
+  $('#phone').classList.remove('ad-off');
   const item = (a) => `<span class="ad-item">${a.img ? `<img src="${esc(a.img)}" alt="${esc(a.name)}">` : `<span class="ad-logo" style="--ab:${a.color};--af:${a.accent}">${esc(a.name)}</span>`}<span class="ad-tag">${esc(a.tag)}</span></span>`;
   const run = ADS.map(item).join('');
   el.innerHTML = `<span class="ad-label">Publicidad</span><div class="ad-track" aria-hidden="true"><div class="ad-run">${run}${run}${run}${run}</div></div><span class="sr">Publicidad: ${ADS.map((a) => a.name).join(' y ')}</span><button class="ad-x" data-act="ad-close" aria-label="Cerrar publicidad">${I.x}</button>`;
@@ -1958,7 +1963,7 @@ document.addEventListener('click', async (e) => {
     case 'nv-reset': S.nuevo = null; renderNuevo(); break;
     case 'sim': toggleSim(); break;
     case 'sim-photo': simCapturePhoto(); break;
-    case 'ad-close': $('#phone').classList.add('ad-off'); try { sessionStorage.setItem('nx4.adOff', '1'); } catch { /* sin almacenamiento */ } break;
+    case 'ad-close': closeAd(); break;
     case 'cap-retry': if (S.capture?.file) onCapturePhoto(S.capture.file); break;
     case 'use-demo': stopWatch(); settings.demo = true; refreshAvatar(); closeModal(); setPos(DEMO.lat, DEMO.lng, DEMO.label); break;
     case 'use-gps': closeModal(); locate(); break;
