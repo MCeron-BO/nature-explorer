@@ -17,7 +17,7 @@ Abre http://localhost:5176
 | 1 · Selección de reino | Logo de hojas centrado, «¿Qué quieres explorar hoy?», paisaje de montañas de fondo, tres tarjetas horizontales (foto, ícono, nombre, descripción y flecha) y la frase «Un mundo por descubrir». Fauna y Hongos siguen como *Próximamente*. |
 | 2 · Mapa (Flora) | Cabecera blanca con logo «Nature Explorer · Flora» y engranaje de ajustes; tarjeta «Radio de búsqueda» con botones segmentados; pines tipo gota con la foto de cada especie; botones redondos de ubicación y capas; botones grandes **Capturar** y **Nuevo Registro**; escala del mapa; panel con «N especies de plantas en un radio de X km» y 4 cifras (Nativas, Endémicas, Amenazadas, Registros). |
 | 3 · Listado de especies | «Flora del entorno» con volver y lupa; buscador con botón de filtros; filas con foto, nombre, nombre científico, distancia, registros y flecha; barra verde **Descargar listado del entorno** que se despliega con Excel, CSV, PDF, KML y KMZ. |
-| 4 · Nuevo registro | Todo en una sola pantalla: foto principal con lápiz para cambiarla, miniaturas y «Agregar fotos», Ubicación y Fecha y hora con **Editar**, «Identificar especie» con **Sugerir con IA** o **Buscar en catálogo**, coincidencias con barra y porcentaje, aviso de resultado (por ejemplo «Posible nuevo registro local») y **Guardar observación**. |
+| 4 · Nuevo registro | Todo en una sola pantalla: foto principal con lápiz para cambiarla, miniaturas y «Agregar fotos» (cada vez se elige **Cámara** o **Galería**). Después de agregar fotos se abre un mapa que parte desde tu ubicación y **tú marcas el punto** donde las tomaste; cada foto guarda sus coordenadas y la observación usa las de la foto principal. Fecha y hora con **Editar**; «Identificar especie» parte en **Buscar en catálogo** y como segunda opción **Sugerir con IA**; aviso de resultado (por ejemplo «Posible nuevo registro local») y un botón **Guardar observación** grande, fijo al pie de la pantalla. |
 
 ## Cambios de navegación
 
@@ -33,9 +33,9 @@ Abre http://localhost:5176
    - las especies, sus registros y coordenadas, y sus familias;
    - las fotos que lo permiten (las de licencia abierta de iNaturalist).
 2. **En terreno, sin señal:** la app abre igual (queda guardada en el teléfono). El GPS no necesita datos móviles, así que tu posición, las capturas y los nuevos registros se ubican sobre el mapa guardado. La validación usa los registros de la zona y queda marcada **por verificar**; el catálogo busca entre las especies de la zona.
-3. **Al volver la conexión:** la app verifica sola con iNaturalist y GBIF las observaciones hechas sin señal, recarga los datos en vivo y te recuerda las que quedaron por publicar en iNaturalist.
+3. **Al volver la conexión:** la app verifica sola con iNaturalist y GBIF las observaciones hechas sin señal y recarga los datos en vivo.
 
-Lo que necesita conexión sí o sí: la identificación con IA (token de iNaturalist), el gráfico de observaciones por mes, las fichas de especies que no hayas abierto antes y publicar en iNaturalist.
+Lo que necesita conexión sí o sí: la identificación con IA (token de iNaturalist), el gráfico de observaciones por mes y las fichas de especies que no hayas abierto antes.
 
 Técnicamente: `sw.js` es un *service worker* (app y librerías guardadas; APIs con red primero y respaldo guardado; mapa y fotos con lo guardado primero). Al publicar cambios, sube `VERSION` en `sw.js`.
 
