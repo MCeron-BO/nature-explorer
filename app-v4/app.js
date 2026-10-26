@@ -343,7 +343,7 @@ async function loadArea() {
 const findSp = (id) => S.species.find((s) => s.id === id) || S.ficha?.sp || S.collection.find((c) => c.id === id);
 
 /* ---------- mapa ---------- */
-let map, circle, userMarker, pointsLayer, selRing, baseLayers;
+let map, circle, userMarker, pointsLayer, selRing, selLine, baseLayers;
 function toggleLayer() {
   if (!map) return;
   const next = settings.layer === 'topo' ? 'sat' : 'topo';
@@ -509,7 +509,7 @@ function setRadius(km) {
 function setPos(lat, lng, label) {
   S.pos = { lat, lng }; S.posLabel = label;
   saveSettings();
-  if (map) { userMarker.setLatLng([lat, lng]); circle.setLatLng([lat, lng]); fitRadius(); }
+  if (map) { userMarker.setLatLng([lat, lng]); circle.setLatLng([lat, lng]); fitRadius(); drawSelLine(); }
   renderRadii();
   loadArea();
 }
@@ -562,7 +562,27 @@ function renderRadii() {
   ll.textContent = `Flora · ${!navigator.onLine ? 'sin conexión' : settings.demo ? 'ubicación de prueba' : 'mi ubicación'}`;
   ll.title = S.posLabel;
 }
+// Línea desde tu avatar hasta la planta elegida; sigue al avatar mientras caminas y cambia al elegir otra planta.
+function drawSelLine() {
+  const p = S.selected;
+  if (!map || !p) { if (selLine) { selLine.remove(); selLine = null; } return; }
+  const ll = [[S.pos.lat, S.pos.lng], [p.lat, p.lng]];
+  const d = fmtDist(dist(S.pos, p));
+  if (!selLine) {
+    selLine = L.layerGroup([
+      L.polyline(ll, { color: '#0F2A1C', weight: 7, opacity: 0.45, interactive: false }),
+      L.polyline(ll, { color: '#B8F24A', weight: 4, dashArray: '10 8', lineCap: 'round', interactive: false, className: 'sel-line' })
+    ]).addTo(map);
+    selLine.getLayers()[1].bindTooltip(d, { permanent: true, direction: 'center', className: 'sel-dist' });
+  } else {
+    selLine.eachLayer((l) => l.setLatLngs(ll));
+    const t = selLine.getLayers()[1];
+    t.setTooltipContent(d);
+    t.closeTooltip(); t.openTooltip(L.latLng((ll[0][0] + ll[1][0]) / 2, (ll[0][1] + ll[1][1]) / 2));
+  }
+}
 function renderNear() {
+  drawSelLine();
   const el = $('#near-card');
   const p = S.selected;
   if (!p || S.loading) { el.classList.remove('on'); requestAnimationFrame(placeFloating); return; }

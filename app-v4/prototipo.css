@@ -428,3 +428,10 @@ body.is-offline .map-title span:not(.logo-leaf){color:#B23A2E;font-weight:800}
 .km-in input::-webkit-outer-spin-button,.km-in input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .km-in input:focus{outline:2px solid var(--g700);outline-offset:2px;border-radius:4px;background:#fff}
 .km-in span{font:800 12px var(--display);color:var(--ink2);padding-right:4px}
+
+/* Línea del avatar a la planta elegida */
+.sel-line{animation:sel-dash 1.2s linear infinite}
+@keyframes sel-dash{to{stroke-dashoffset:-18}}
+@media (prefers-reduced-motion:reduce){.sel-line{animation:none}}
+.leaflet-tooltip.sel-dist{background:#0F2A1C;color:#fff;border:none;border-radius:999px;padding:3px 9px;font:700 12px var(--font,inherit);box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.leaflet-tooltip.sel-dist::before{display:none}
