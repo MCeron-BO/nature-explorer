@@ -521,3 +521,6 @@ body.is-offline .map-title span:not(.logo-leaf){color:#B23A2E;font-weight:800}
 .nv-recent-row b{font-size:12px;line-height:1.2;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nv-recent-row i{font-size:10.5px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nv-recent-row button.on{border:2px solid var(--g900);background:var(--g50);padding:5px 5px 7px}
+
+/* Versión de la app, solo en la pantalla de inicio */
+.app-ver{position:absolute;top:10px;right:14px;z-index:2;font:700 11px var(--display);color:var(--ink2);background:rgba(255,255,255,.85);border:1px solid var(--line);border-radius:999px;padding:3px 9px}
