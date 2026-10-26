@@ -493,3 +493,9 @@ body.is-offline .map-title span:not(.logo-leaf){color:#B23A2E;font-weight:800}
 .sheet .sheet-more{height:40px;border-radius:12px;background:var(--g900);color:#fff;font-size:14px;gap:8px;padding:0 14px;box-shadow:0 2px 0 rgba(23,36,29,.18)}
 .sheet .sheet-more span{flex:1;text-align:left}
 .sheet .sheet-more svg{width:18px;height:18px}
+/* «Ir al detalle»: enlace al final de la línea del resumen, con zona de toque amplia */
+.sum-row{display:flex;align-items:center;gap:6px}
+.sum-row .sum-line{flex:1;min-width:0;padding-top:0}
+.sum-go{flex:none;border:none;background:none;display:flex;align-items:center;gap:1px;min-height:36px;margin:-8px -8px -8px 0;padding:0 8px 0 10px;color:var(--g900);font-size:13px;font-weight:800;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
+.sum-go svg{width:15px;height:15px}
+.sum-go:active{opacity:.6}
