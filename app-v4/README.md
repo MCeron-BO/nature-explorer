@@ -26,6 +26,13 @@ Abre http://localhost:5176
 - El nivel y el XP se ven en la pantalla de inicio, en Mis Observaciones y en Más.
 - El botón de capas alterna entre mapa **satelital** y **topográfico**.
 
+## Alias de especies
+
+- En la ficha de cada especie, **+ Agregar alias** guarda un apodo tuyo (por ejemplo «bambú AS»). Sugiere abreviaturas con un toque: primera palabra + iniciales («Aguja DP»), solo iniciales («ADP») o el científico abreviado («E. cicutarium»). Una especie puede tener varios alias; si repites uno en dos especies, la búsqueda muestra ambas.
+- El buscador del mapa, el de Especies y «Buscar en catálogo» de Nuevo registro revisan tus alias **primero**, sin importar mayúsculas, tildes ni espacios («bambu as», «BambúAS»). Los resultados con alias llevan la etiqueta ★. Además reconocen las iniciales del nombre común aunque no tengas alias («adp» → Aguja del pastor).
+- **Más › Mis alias** lista todos para editarlos (toca el alias), eliminarlos (X), abrir la ficha, y **Exportar / Importar** un archivo `.json` para respaldarlos o pasarlos a otro teléfono.
+- Se guardan solo en este teléfono (`nx4.aliases`), por especie (id de iNaturalist o nombre científico), y funcionan sin conexión.
+
 ## Modo DEMO y publicidad
 
 - **DEMO** (botón pequeño bajo los botones del mapa): pone 6 especies reales de la zona alrededor de tu avatar, 4 dentro de la distancia de captura y 2 un poco más lejos para probar el radar. Se marcan con la etiqueta «DEMO». Al capturarlas, la cámara ofrece **Simular foto y validación**: usa la foto de la especie, simula la IA y valida con los registros reales de la zona. Lo guardado queda marcado «DEMO» en la colección. Si se toma una foto real, la validación es la normal.
@@ -46,4 +53,4 @@ Técnicamente: `sw.js` es un *service worker* (app y librerías guardadas; APIs 
 
 ## Datos guardados
 
-En `localStorage` con claves propias (`nx4.settings`, `nx4.collection`, `nx4.game`), separadas de las otras versiones.
+En `localStorage` con claves propias (`nx4.settings`, `nx4.collection`, `nx4.game`, `nx4.aliases`), separadas de las otras versiones.
