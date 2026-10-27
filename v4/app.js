@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.2';
+const APP_VERSION = '1.0.3';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -166,6 +166,9 @@ const S = {
 };
 const saveSettings = () => ls.set('nx4.settings', Object.assign(settings, { lat: S.pos.lat, lng: S.pos.lng, label: S.posLabel, radius: S.radius }));
 const saveCollection = () => ls.set('nx4.collection', S.collection);
+// Alias: apodos tuyos por especie (id de iNaturalist o, si no tiene, nombre científico). Solo en este teléfono.
+let aliases = ls.get('nx4.aliases', []);
+const saveAliases = () => ls.set('nx4.aliases', aliases);
 
 /* ---------- juego: XP, niveles, rareza y logros ---------- */
 const AVATARS = ['🧑', '👩', '👨', '🐸', '🦉', '🐝', '🦎', '🐢', '🐼', '🐙', '🦋', '🐞'];
@@ -369,6 +372,7 @@ function openMore() {
     <button class="hud" data-act="profile" style="flex:none" aria-label="Ver tu perfil y logros"><span class="av">${settings.avatar}</span><span class="meta"><b>Nivel ${L.lv} · ${L.title}</b><span class="xpbar"><i style="width:${L.pct}%"></i></span></span><small>${nf(game.xp)} XP</small></button>
     <div class="menu">
       <button data-act="profile">${I.star}<span>Perfil, avatar y logros</span>${I.right}</button>
+      <button data-act="aliases">${I.star}<span>Mis alias de especies</span>${I.right}</button>
       <button data-act="open-settings">${I.filter}<span>Ajustes: ubicación, sonido e IA</span>${I.right}</button>
       <button data-act="credits">${I.book}<span>Créditos del mapa y los datos</span>${I.right}</button>
       <button data-act="offline">${I.dl}<span>Mapa sin conexión</span>${I.right}</button>
@@ -670,7 +674,7 @@ function spRow(s) {
     s.gbifOnly ? '<span class="tag" style="color:var(--muted);background:#EEF2EF">GBIF</span>' : ''
   ].join('');
   const r = rarity(s);
-  return `<a class="sp" href="#ficha/${esc(s.id)}"><span class="sp-ph" style="--rc:${r.color}" title="${r.name}">${thumb(s.photo, 'sm')}</span><div class="info"><div class="nm"><span>${esc(s.common || s.sci)}</span>${tags}</div><span class="sci">${esc(s.sci)}</span></div><div class="meta"><b>${I.pin.replace('aria-hidden', 'style="width:12px;height:12px" aria-hidden')}${fmtDist(s.dist)}</b><span>${nf(s.inatCount + s.gbifCount)} reg.</span></div><span class="chev-r">${I.right}</span></a>`;
+  return `<a class="sp" href="#ficha/${esc(s.id)}"><span class="sp-ph" style="--rc:${r.color}" title="${r.name}">${thumb(s.photo, 'sm')}</span><div class="info"><div class="nm"><span>${esc(s.common || s.sci)}</span>${aliasesOf(s)[0] ? `<span class="al-tag">★ ${esc(aliasesOf(s)[0])}</span>` : ''}${tags}</div><span class="sci">${esc(s.sci)}</span></div><div class="meta"><b>${I.pin.replace('aria-hidden', 'style="width:12px;height:12px" aria-hidden')}${fmtDist(s.dist)}</b><span>${nf(s.inatCount + s.gbifCount)} reg.</span></div><span class="chev-r">${I.right}</span></a>`;
 }
 
 /* ---------- inicio ---------- */
@@ -752,9 +756,11 @@ function setSort(mode) {
 }
 function filtered() {
   const q = S.q.trim().toLowerCase();
-  return sortSpecies(S.species.filter((s) =>
+  const list = sortSpecies(S.species.filter((s) =>
     (S.filter === 'todas' || (S.filter === 'nativas' && s.native) || (S.filter === 'endemicas' && s.endemic) || (S.filter === 'amenazadas' && s.threatened)) &&
-    (!q || s.sci.toLowerCase().includes(q) || (s.common || '').toLowerCase().includes(q))));
+    (!q || s.sci.toLowerCase().includes(q) || (s.common || '').toLowerCase().includes(q) || aliasHit(s, q) || initialsHit(s.common || '', q))));
+  // Las especies que coinciden con un alias tuyo van primero.
+  return q ? [...list.filter((s) => aliasHit(s, q)), ...list.filter((s) => !aliasHit(s, q))] : list;
 }
 function renderEspecies() {
   const el = $('#s-especies');
@@ -763,7 +769,7 @@ function renderEspecies() {
     // Pantalla 3 del prototipo: título con volver, buscador con botón de filtros, orden y descarga arriba (abajo va la publicidad).
     el.innerHTML = `<div class="head">
       <div class="title-row"><a href="#mapa" class="icon-btn" aria-label="Volver al mapa">${I.back}</a><div style="flex:1;min-width:0"><h1>Flora del entorno</h1><span class="muted" style="font-size:13px" id="esp-sub"></span></div><button class="icon-btn" data-act="focus-q" aria-label="Buscar">${I.search}</button></div>
-      <div class="search-row"><div class="search">${I.search}<label for="q" class="sr">Buscar especie por nombre común o científico</label><input id="q" type="search" placeholder="Buscar especie (nombre común o científico)…" autocomplete="off"></div><button class="icon-btn boxed" data-act="toggle-filters" aria-label="Filtros" id="btn-filters">${I.filter}</button></div>
+      <div class="search-row"><div class="search">${I.search}<label for="q" class="sr">Buscar especie por nombre común o científico</label><input id="q" type="search" placeholder="Buscar por nombre común, científico o alias…" autocomplete="off"></div><button class="icon-btn boxed" data-act="toggle-filters" aria-label="Filtros" id="btn-filters">${I.filter}</button></div>
       <div class="filters" id="filters"></div><div class="esp-tools"><div id="esp-sort"></div><button class="dl-mini" id="dl-btn" data-act="dl-toggle" aria-label="Descargar el listado de especies del entorno">${I.dl}<span>Descargar lista</span></button></div><div id="dl-panel"></div></div><div class="scrollarea" id="esp-list"></div>`;
     $('#q').addEventListener('input', (e) => { S.q = e.target.value; renderEspecies(); });
   }
@@ -865,6 +871,7 @@ async function renderFicha(id) {
   const el = $('#s-ficha');
   let sp = findSp(id);
   if (!sp && /^\d+$/.test(id)) sp = { id, inatId: Number(id), sci: '', common: '' };
+  if (!sp) { const e = aliases.find((a) => a.spId === id); if (e) sp = { id, inatId: e.inatId, sci: e.sci, common: e.common, photo: e.photo }; }
   if (!sp) { el.innerHTML = `<div class="state">Especie no encontrada. <a href="#especies">Volver al listado</a></div>`; return; }
   el.innerHTML = '<div class="state" style="padding-top:120px"><div class="spinner"></div>Cargando ficha…</div>';
   el.scrollTop = 0;
@@ -921,6 +928,7 @@ async function renderFicha(id) {
         ${tags ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${tags}</div>` : ''}
         <h1 style="margin:4px 0 0;font-size:30px">${esc(cap(t?.preferred_common_name) || sp.common || sci)}</h1>
         <div class="sci" style="font-size:21px;color:var(--ink2)">${esc(sci)}</div>
+        <div class="al-row" id="al-row">${aliasRowHtml(S.ficha.sp)}</div>
         <div class="muted" style="font-size:14px">${fam ? `Familia ${esc(fam)}` : ''}${ord ? ` · Orden ${esc(ord)}` : ''}</div>
       </div>
       <div class="mini" style="gap:14px">
@@ -1368,7 +1376,7 @@ function renderNuevo() {
   const matchBtn = (m, i) => `<button class="nv-match ${isSel(m.taxon) ? 'on' : ''}" data-nv-pick="${i}">${thumb(photoUrl(m.taxon.default_photo, 'square'), 'sm')}<span class="info"><b class="sci">${esc(m.taxon.name)}</b><span>${esc(cap(m.taxon.preferred_common_name) || m.note || '')}</span>${m.pct != null ? `<span class="bar"><i style="width:${m.pct}%"></i></span>` : `<span class="muted" style="font-size:11px">${esc(m.note || '')}</span>`}</span>${m.pct != null ? `<b class="pct">${m.pct}%</b>` : ''}</button>`;
   const chosen = n.sel ? `<div class="muted" style="font-size:12px;font-weight:700">Especie elegida</div><div class="nv-match on">${thumb(photoUrl(n.sel.taxon.default_photo, 'square'), 'sm')}<span class="info"><b class="sci">${esc(n.sel.taxon.name)}</b><span>${esc(cap(n.sel.taxon.preferred_common_name) || n.sel.note || '')}</span></span>${n.sel.pct != null ? `<b class="pct">${n.sel.pct}%</b>` : ''}</div>` : '';
   const matches = n.mode === 'cat'
-    ? `${chosen}<div class="search">${I.search}<label for="cat" class="sr">Buscar en el catálogo oficial</label><input id="cat" type="search" placeholder="Nombre común o científico" value="${esc(n.q)}" autocomplete="off"></div><div id="cat-res"></div>`
+    ? `${chosen}<div class="search">${I.search}<label for="cat" class="sr">Buscar en el catálogo oficial</label><input id="cat" type="search" placeholder="Nombre común, científico o tu alias" value="${esc(n.q)}" autocomplete="off"></div><div id="cat-res"></div>`
     : (n.analyzing ? '<div class="state" style="padding:12px"><div class="spinner"></div>Buscando coincidencias…</div>'
       : (n.ai || []).map(matchBtn).join('')
         + (n.usedAI ? '' : '<div class="muted" style="font-size:12px;line-height:1.4">Sin token de iNaturalist, la app sugiere las especies con más registros cerca. Actívalo en Ajustes para reconocer la foto.</div>'));
@@ -1438,17 +1446,24 @@ function openPhotoSource(how) {
 async function catalogSearch() {
   const n = S.nuevo, box = $('#cat-res');
   if (!box) return;
-  if (n.q.trim().length < 2) { box.innerHTML = ''; return; }
+  const raw = n.q.trim();
+  if (!raw) { box.innerHTML = ''; return; }
+  // Tus alias van primero (funcionan sin conexión y desde la primera letra).
+  const mine = aliases.filter((e) => e.inatId && e.names.some((a) => aliasMatch(a, raw)))
+    .map((e) => ({ id: e.inatId, name: e.sci, preferred_common_name: e.common, default_photo: { square_url: e.photo }, alias: e.names.find((a) => aliasMatch(a, raw)) }));
+  const ids = new Set(mine.map((t) => t.id));
+  const row = (t, i) => `<button class="nv-match" data-cat="${i}">${thumb(photoUrl(t.default_photo, 'square'), 'sm')}<span class="info"><b class="sci">${esc(t.name)}</b><span>${esc(cap(t.preferred_common_name) || t.rank || '')}${t.alias ? ` <span class="al-tag">★ ${esc(t.alias)}</span>` : ''}</span></span></button>`;
+  if (raw.length < 2) { n.catalog = mine; box.innerHTML = mine.map(row).join(''); return; }
   try {
     const r = await getJSON(`${INAT}/taxa/autocomplete?q=${encodeURIComponent(n.q)}&taxon_id=${PLANTAE}&locale=es&per_page=6`);
-    n.catalog = r.results;
-    box.innerHTML = r.results.map((t, i) => `<button class="nv-match" data-cat="${i}">${thumb(photoUrl(t.default_photo, 'square'), 'sm')}<span class="info"><b class="sci">${esc(t.name)}</b><span>${esc(cap(t.preferred_common_name) || t.rank)}</span></span></button>`).join('') || '<div class="muted" style="font-size:14px">Sin coincidencias.</div>';
+    n.catalog = [...mine, ...r.results.filter((t) => !ids.has(t.id))];
+    box.innerHTML = n.catalog.map(row).join('') || '<div class="muted" style="font-size:14px">Sin coincidencias.</div>';
   } catch {
     // Sin conexión: busca entre las especies de la zona guardada.
-    const q = fold(n.q.trim());
-    const local = S.species.filter((s) => prefixAt(s.common || '', q) >= 0 || prefixAt(s.sci, q) >= 0).sort(byName).slice(0, 8);
-    n.catalog = local.map(offlineTaxon);
-    box.innerHTML = local.length ? `<div class="muted" style="font-size:12px;margin-bottom:4px">Sin conexión · especies de la zona guardada</div>` + n.catalog.map((t, i) => `<button class="nv-match" data-cat="${i}">${thumb(photoUrl(t.default_photo, 'square'), 'sm')}<span class="info"><b class="sci">${esc(t.name)}</b><span>${esc(cap(t.preferred_common_name))}</span></span></button>`).join('') : '<div class="muted" style="font-size:13px">Sin conexión y sin coincidencias en la zona guardada.</div>';
+    const q = fold(raw);
+    const local = S.species.filter((s) => s.inatId && !ids.has(s.inatId) && (prefixAt(s.common || '', q) >= 0 || prefixAt(s.sci, q) >= 0 || initialsHit(s.common || '', raw))).sort(byName).slice(0, 8);
+    n.catalog = [...mine, ...local.map(offlineTaxon)];
+    box.innerHTML = n.catalog.length ? `<div class="muted" style="font-size:12px;margin-bottom:4px">Sin conexión · tus alias y especies de la zona guardada</div>` + n.catalog.map(row).join('') : '<div class="muted" style="font-size:13px">Sin conexión y sin coincidencias en la zona guardada.</div>';
   }
 }
 // Agrega fotos o reemplaza la principal; luego la persona marca en el mapa dónde las tomó.
@@ -1850,6 +1865,163 @@ function markPrefix(name, at, len) {
   if (at < 0) return esc(name);
   return `${esc(name.slice(0, at))}<mark>${esc(name.slice(at, at + len))}</mark>${esc(name.slice(at + len))}`;
 }
+/* ---------- alias de especies ---------- */
+// Compara sin mayúsculas, tildes, espacios ni signos: «BambúAS» = «bambu as».
+const squash = (t) => fold(t).replace(/[^a-z0-9]/g, '');
+function aliasEntry(sp) {
+  if (!sp) return null;
+  const id = sp.inatId ?? (sp.sci == null ? sp.id : null), k = key2(sp.sci ?? sp.name);
+  return aliases.find((a) => (id && a.inatId === id) || (k && a.key === k)) || null;
+}
+const aliasesOf = (sp) => aliasEntry(sp)?.names || [];
+function aliasMatch(a, q) {
+  const sq = squash(q);
+  return !!sq && (squash(a).startsWith(sq) || prefixAt(a, fold(q)) >= 0);
+}
+const aliasHit = (sp, q) => aliasesOf(sp).find((a) => aliasMatch(a, q)) || null;
+// Abreviaturas automáticas del nombre común: iniciales («bas») y primera palabra + iniciales («bambu as»).
+function autoAbbr(name) {
+  const w = fold(name).split(/[\s\-]+/).filter(Boolean);
+  return w.length < 2 ? [] : [w.map((x) => x[0]).join(''), `${w[0]} ${w.slice(1).map((x) => x[0]).join('')}`];
+}
+function initialsHit(name, q) {
+  const sq = squash(q);
+  return sq.length >= 2 && autoAbbr(name).some((ab) => squash(ab) === sq || (sq.length >= 3 && squash(ab).startsWith(sq)));
+}
+function aliasSuggestions(common, sci) {
+  const out = [];
+  const w = String(common || '').trim().split(/[\s\-]+/).filter(Boolean);
+  if (w.length >= 2) out.push(`${cap(w[0])} ${w.slice(1).map((x) => x[0].toUpperCase()).join('')}`, w.map((x) => x[0].toUpperCase()).join(''));
+  const sn = String(sci || '').split(/\s+/);
+  if (sn.length >= 2) out.push(`${sn[0][0]}. ${sn[1]}`);
+  return [...new Set(out)];
+}
+const aliasChip = (a, ei, i) => `<span class="al-chip"><button class="al-name" data-al-edit="${ei}:${i}" aria-label="Editar el alias ${esc(a)}">★ ${esc(a)}</button><button class="al-x" data-al-del="${ei}:${i}" aria-label="Eliminar el alias ${esc(a)}">${I.x}</button></span>`;
+function aliasRowHtml(sp) {
+  const ei = aliases.indexOf(aliasEntry(sp));
+  return (ei < 0 ? '' : aliases[ei].names.map((a, i) => aliasChip(a, ei, i)).join('')) + '<button class="al-add" data-act="al-add">+ Agregar alias</button>';
+}
+function refreshAliasViews() {
+  const row = $('#al-row');
+  if (row && S.ficha) row.innerHTML = aliasRowHtml(S.ficha.sp);
+  if ($('#al-list')) renderAliasList();
+  if ($('#s-especies').dataset.ok) renderEspecies();
+}
+function openAliasModal(sp, edit, from = 'ficha') {
+  const e = edit ? aliases[edit.ei] : null;
+  const base = e || { sci: sp.sci, common: cap(sp.common), photo: sp.photo };
+  const have = (e || aliasEntry(sp))?.names || [];
+  const sugs = aliasSuggestions(base.common, base.sci).filter((x) => !have.some((n) => squash(n) === squash(x)));
+  S.aliasCtx = { sp, edit, from };
+  openModal(`<div class="top"><h2>${edit ? 'Editar alias' : 'Agregar alias'}</h2><button class="x" data-act="al-cancel" aria-label="Cerrar">${I.x}</button></div>
+    <div class="mini">${thumb(base.photo, 'sm')}<div class="info"><b style="font-size:15px">${esc(base.common || base.sci)}</b><span class="sci" style="font-size:13px;color:var(--ink2)">${esc(base.sci)}</span></div></div>
+    <div class="field"><label for="al-in">Alias: cómo la recuerdas tú</label><input id="al-in" maxlength="30" autocomplete="off" placeholder="Ej.: bambú AS" value="${edit ? esc(e.names[edit.i]) : ''}"></div>
+    ${sugs.length ? `<div class="al-sugs"><span class="muted" style="font-size:12px;font-weight:700">Sugerencias · toca para usarla</span><div>${sugs.map((x) => `<button class="chip-btn" data-al-sug="${esc(x)}">${esc(x)}</button>`).join('')}</div></div>` : ''}
+    <p class="muted" style="margin:0;font-size:13px;line-height:1.45">Escríbelo en el buscador del mapa, en Especies o en Nuevo registro y esta especie aparece primero. Se guarda solo en este teléfono.</p>
+    <div class="two"><button class="btn light" data-act="al-cancel">Cancelar</button><button class="btn" data-act="al-save">${I.check}Guardar</button></div>`);
+  const inp = $('#al-in');
+  inp.focus();
+  inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') saveAliasModal(); });
+}
+function closeAliasModal() {
+  const c = S.aliasCtx;
+  S.aliasCtx = null;
+  if (c?.from === 'list') openAliasList(); else closeModal();
+}
+function saveAliasModal() {
+  const c = S.aliasCtx;
+  if (!c) return;
+  const v = $('#al-in').value.trim().replace(/\s+/g, ' ');
+  if (!squash(v)) { toast('Escribe un alias.'); return; }
+  let e;
+  if (c.edit) {
+    e = aliases[c.edit.ei];
+    if (e.names.some((n, i) => i !== c.edit.i && squash(n) === squash(v))) { toast('Esta especie ya tiene ese alias.'); return; }
+    e.names[c.edit.i] = v;
+  } else {
+    e = aliasEntry(c.sp);
+    if (!e) { e = { inatId: c.sp.inatId ?? null, key: key2(c.sp.sci), sci: c.sp.sci, common: cap(c.sp.common), photo: c.sp.photo || '', spId: c.sp.id, names: [] }; aliases.push(e); }
+    if (e.names.some((n) => squash(n) === squash(v))) { toast('Esta especie ya tiene ese alias.'); return; }
+    e.names.push(v);
+    Object.assign(e, { inatId: e.inatId ?? c.sp.inatId ?? null, common: e.common || cap(c.sp.common), photo: e.photo || c.sp.photo || '' });
+  }
+  // Un mismo alias en dos especies se permite: la búsqueda muestra ambas.
+  const other = aliases.find((o) => o !== e && o.names.some((n) => squash(n) === squash(v)));
+  saveAliases();
+  sfx('pop');
+  toast(other ? `Guardado. «${v}» también es de ${other.common || other.sci}: verás ambas.` : `Alias «${v}» guardado`);
+  closeAliasModal();
+  refreshAliasViews();
+}
+function deleteAlias(ei, i) {
+  const e = aliases[ei];
+  if (!e?.names[i]) return;
+  const [gone] = e.names.splice(i, 1);
+  if (!e.names.length) aliases.splice(ei, 1);
+  saveAliases();
+  sfx('pop');
+  toast(`Alias «${gone}» eliminado`);
+  refreshAliasViews();
+}
+// Más › Mis alias: ver, editar, eliminar, exportar e importar.
+function openAliasList() {
+  openModal(`<div class="top"><h2>Mis alias</h2><button class="x" data-act="modal-close" aria-label="Cerrar">${I.x}</button></div>
+    <p class="muted" style="margin:0;font-size:13px;line-height:1.45">Apodos tuyos para encontrar especies más rápido en los buscadores. Toca un alias para editarlo; se agregan desde la ficha de cada especie.</p>
+    ${aliases.length > 5 ? `<div class="search">${I.search}<label for="al-q" class="sr">Buscar en tus alias</label><input id="al-q" type="search" placeholder="Buscar alias o especie" autocomplete="off"></div>` : ''}
+    <div id="al-list" class="al-list"></div>
+    <div class="two"><button class="btn light" data-act="al-export" ${aliases.length ? '' : 'disabled'}>${I.dl}Exportar</button><label class="btn light">${I.up}Importar<input type="file" accept=".json,application/json" class="sr" data-al-import="1"></label></div>`);
+  $('#al-q')?.addEventListener('input', renderAliasList);
+  renderAliasList();
+}
+function renderAliasList() {
+  const box = $('#al-list');
+  if (!box) return;
+  const q = fold($('#al-q')?.value.trim());
+  const rows = aliases.map((e, ei) => ({ e, ei }))
+    .filter(({ e }) => !q || [e.common, e.sci, ...e.names].some((x) => fold(x).includes(q)))
+    .sort((a, b) => fold(a.e.names[0]).localeCompare(fold(b.e.names[0]), 'es'));
+  box.innerHTML = !aliases.length ? '<div class="al-empty">Aún no tienes alias. Abre la ficha de una especie y toca «+ Agregar alias».</div>'
+    : !rows.length ? '<div class="al-empty">Sin coincidencias.</div>'
+      : rows.map(({ e, ei }) => `<div class="al-item">${thumb(e.photo, 'sm')}<div class="info"><button class="al-open" data-al-open="${esc(e.inatId || e.spId)}" aria-label="Abrir la ficha de ${esc(e.common || e.sci)}"><b>${esc(e.common || e.sci)}</b><span class="sci">${esc(e.sci)}</span></button><div class="al-row">${e.names.map((a, i) => aliasChip(a, ei, i)).join('')}</div></div></div>`).join('');
+}
+function exportAliases() {
+  const n = aliases.reduce((t, e) => t + e.names.length, 0);
+  const blob = new Blob([JSON.stringify({ app: 'nature-explorer-v4', tipo: 'alias', version: 1, fecha: new Date().toISOString(), alias: aliases }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `nature-explorer-alias-${today()}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast(`${nf(n)} alias exportados`);
+}
+async function importAliases(file) {
+  try {
+    const data = JSON.parse(await file.text());
+    const list = Array.isArray(data) ? data : data?.alias;
+    if (!Array.isArray(list)) throw new Error('formato');
+    let added = 0;
+    for (const x of list) {
+      if (!x?.sci || !Array.isArray(x.names)) continue;
+      const inatId = Number(x.inatId) || null;
+      let e = aliasEntry({ inatId, sci: String(x.sci) });
+      if (!e) {
+        e = { inatId, key: key2(x.sci), sci: String(x.sci), common: String(x.common || ''), photo: /^https:\/\//.test(x.photo || '') ? x.photo : '', spId: String(x.spId || inatId || ''), names: [] };
+        aliases.push(e);
+      }
+      for (const nm of x.names) {
+        const v = String(nm).trim().replace(/\s+/g, ' ').slice(0, 30);
+        if (squash(v) && !e.names.some((m) => squash(m) === squash(v))) { e.names.push(v); added++; }
+      }
+    }
+    aliases = aliases.filter((e) => e.names.length);
+    saveAliases();
+    toast(added ? `Se importaron ${nf(added)} alias` : 'No había alias nuevos en el archivo.');
+    openAliasList();
+    refreshAliasViews();
+  } catch {
+    toast('El archivo no es una lista de alias válida.');
+  }
+}
 function mapSearch() {
   const raw = $('#mq').value.trim();
   const q = fold(raw);
@@ -1860,16 +2032,18 @@ function mapSearch() {
     const label = s.common || s.sci;
     const ac = prefixAt(label, q);
     const as = prefixAt(s.sci, q);
-    if (ac < 0 && as < 0) continue;
-    hits.push({ s, label, ac, as });
+    const al = aliasHit(s, raw);
+    if (ac < 0 && as < 0 && !al && !initialsHit(label, raw)) continue;
+    // Primero tus alias, luego los nombres y al final las coincidencias por iniciales.
+    hits.push({ s, label, ac, as, al, tag: al || aliasesOf(s)[0], rank: al ? 0 : ac >= 0 || as >= 0 ? 1 : 2 });
   }
-  hits.sort((a, b) => (settings.sort === 'dist' ? byDist : byName)(a.s, b.s));
+  hits.sort((a, b) => a.rank - b.rank || (settings.sort === 'dist' ? byDist : byName)(a.s, b.s));
   box.hidden = false;
   box.innerHTML = S.loading ? '<div class="mq-empty">Buscando especies…</div>'
     : hits.length ? `<div class="mq-count"><span>${nf(hits.length)} especie${hits.length === 1 ? '' : 's'}</span>${sortToggle('sm')}</div>`
-      + hits.slice(0, 50).map(({ s, label, ac, as }) => `<button data-mq="${esc(s.id)}">${thumb(s.photo, 'sm')}<span class="info"><b>${markPrefix(label, ac, q.length)}</b><span class="sci">${label === s.sci ? '' : markPrefix(s.sci, as, q.length)}</span></span><span class="d">${fmtDist(s.dist)}</span></button>`).join('')
+      + hits.slice(0, 50).map(({ s, label, ac, as, tag }) => `<button data-mq="${esc(s.id)}">${thumb(s.photo, 'sm')}<span class="info"><b>${markPrefix(label, ac, q.length)}${tag ? ` <span class="al-tag">★ ${esc(tag)}</span>` : ''}</b><span class="sci">${label === s.sci ? '' : markPrefix(s.sci, as, q.length)}</span></span><span class="d">${fmtDist(s.dist)}</span></button>`).join('')
       + `<button class="mq-all" data-act="mq-all">Ver en el listado de Especies ${I.right}</button>`
-      : `<div class="mq-empty">Ninguna especie empieza con «${esc(raw)}» en ${S.radius} km.</div>`;
+      : `<div class="mq-empty">Ninguna especie ni alias empieza con «${esc(raw)}» en ${S.radius} km.</div>`;
   box.scrollTop = 0;
 }
 // Elegir un resultado lleva el mapa al registro más cercano de esa especie y abre su ficha de captura.
@@ -1948,6 +2122,13 @@ document.addEventListener('click', async (e) => {
   if (d.nvRecent != null) { const n = S.nuevo, t = n.recent[Number(d.nvRecent)]; n.sel = { taxon: t, pct: null, note: 'Registrada hace poco' }; sfx('pop'); nuevoClassify(); return; }
   if (d.nvMain) { const n = S.nuevo; n.main = Number(d.nvMain); if (syncNuevoLoc(n) && n.sel) nuevoClassify(); else renderNuevo(); return; }
   if (d.cat) { const n = S.nuevo; n.sel = { taxon: n.catalog[Number(d.cat)], pct: null, note: 'Catálogo oficial' }; n.q = ''; nuevoClassify(); return; }
+  if (d.alEdit || d.alDel) {
+    const [ei, i] = (d.alEdit || d.alDel).split(':').map(Number);
+    if (d.alDel) deleteAlias(ei, i); else openAliasModal(null, { ei, i }, $('#al-list') ? 'list' : 'ficha');
+    return;
+  }
+  if (d.alSug != null) { const inp = $('#al-in'); inp.value = d.alSug; inp.focus(); return; }
+  if (d.alOpen) { closeModal(); location.hash = `#ficha/${d.alOpen}`; return; }
   if (d.coltab) { S.colTab = d.coltab; renderColeccion(); return; }
   if (d.del) { S.collection = S.collection.filter((c) => c.uid !== d.del); saveCollection(); renderColeccion(); return; }
   if (d.revalidate) {
@@ -1991,6 +2172,11 @@ document.addEventListener('click', async (e) => {
     case 'sort-dist': setSort('dist'); break;
     case 'mq-all': S.q = $('#mq').value; hideMapSearch(); location.hash = '#especies'; setTimeout(() => { const q = $('#q'); if (q) q.value = S.q; renderEspecies(); }, 60); break;
     case 'open-settings': openSettings(); break;
+    case 'aliases': openAliasList(); break;
+    case 'al-add': if (S.ficha) openAliasModal(S.ficha.sp); break;
+    case 'al-save': saveAliasModal(); break;
+    case 'al-cancel': closeAliasModal(); break;
+    case 'al-export': exportAliases(); break;
     case 'credits': closeModal(); toast('Imágenes © Esri, Maxar, Earthstar Geographics · Mapa con Leaflet · Datos: GBIF, iNaturalist'); break;
     case 'focus-q': $('#q')?.focus(); break;
     case 'toggle-filters': S.showFilters = !S.showFilters; renderEspecies(); break;
@@ -2032,6 +2218,7 @@ document.addEventListener('change', (e) => {
   }
   const f = e.target.files?.[0];
   if (!f) return;
+  if (e.target.dataset.alImport) { importAliases(f); return; }
   if (e.target.dataset.photoInput === 'capture') onCapturePhoto(f);
   if (e.target.dataset.photoInput === 'nuevo') { onNuevoPhoto(e.target.files, 'add'); closeModal(); }
   if (e.target.dataset.photoInput === 'nuevo-replace') { onNuevoPhoto(e.target.files, 'replace'); closeModal(); }
