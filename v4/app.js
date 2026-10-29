@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.3';
+const APP_VERSION = '1.0.4';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -403,8 +403,10 @@ function initMap() {
   map.on('movestart', () => $('#crosshair').classList.add('on'));
   map.on('moveend', () => setTimeout(() => $('#crosshair').classList.remove('on'), 900));
   map.on('click', () => { selectPoint(null); hideMapSearch(); });
+  map.on('contextmenu', (e) => moveAvatarTo(e.latlng.lat, e.latlng.lng));
   fitRadius();
   renderPoints();
+  renderPhotoPins();
 }
 function avatarIcon() {
   return L.divIcon({ className: '', html: `<div class="avatar-pin ${settings.demo ? 'drag' : ''}"><i></i><span>${settings.avatar}</span>${settings.demo ? '<b>Arrastra para moverte</b>' : ''}</div>`, iconSize: [52, 52], iconAnchor: [26, 26] });
@@ -1053,6 +1055,7 @@ function addToCollection(entry) {
   const i = S.collection.findIndex((c) => c.uid === entry.uid);
   if (i >= 0) S.collection[i] = entry; else S.collection.unshift(entry);
   saveCollection();
+  renderPhotoPins();
 }
 
 /* ---------- captura ---------- */
@@ -1335,8 +1338,8 @@ function renderAd() {
 /* ---------- nuevo registro ---------- */
 // Pantalla 4 del prototipo: todo el nuevo registro en una sola vista (fotos, ubicación, fecha, identificación y guardado).
 function nuevoState() {
-  // Por defecto se identifica buscando en el catálogo; la IA es la segunda opción.
-  return S.nuevo || (S.nuevo = { photos: [], main: 0, mode: 'cat', sel: null, ai: null, q: '', catalog: [], notes: '', uid: `n${Date.now()}`, when: localNow() });
+  // Se identifica buscando en el catálogo o se deja para después (la IA lo hace en Mis Registros).
+  return S.nuevo || (S.nuevo = { photos: [], main: 0, mode: 'cat', sel: null, q: '', catalog: [], notes: '', place: '', uid: `n${Date.now()}`, when: localNow() });
 }
 const hasLoc = (p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng);
 // La ubicación de la observación es la de la foto principal (o la de otra foto si la principal no tiene).
@@ -1353,57 +1356,204 @@ function localNow() {
   return d.toISOString().slice(0, 16);
 }
 const fmtWhen = (v) => new Date(v).toLocaleString('es-CL', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const nvTabs = (tab) => `<div class="nv-tabs" role="tablist"><button role="tab" class="${tab === 'nuevo' ? 'on' : ''}" aria-selected="${tab === 'nuevo'}" data-nvtab="nuevo">Nuevo Registro</button><button role="tab" class="${tab === 'mis' ? 'on' : ''}" aria-selected="${tab === 'mis'}" data-nvtab="mis">Mis Registros</button></div>`;
+// De dónde salió la ubicación de cada foto.
+const LOC_SRC = { foto: 'de la foto', gps: 'GPS', actual: 'GPS · la foto no traía', mapa: 'ajustada en el mapa' };
+function nvLocTexts(n) {
+  const p = n.photos[n.main];
+  const t = `Ubicación${n.photos.length > 1 ? ` · foto ${n.main + 1}` : ''}${p?.src ? ` (${LOC_SRC[p.src]})` : ''}`;
+  const sub = n.lat == null ? 'Sin ubicación · toca el mapa' : n.place || `${n.lat.toFixed(5)}, ${n.lng.toFixed(5)}`;
+  return [t, sub];
+}
+function updateNvLoc() {
+  const n = S.nuevo, a = $('#nv-loc-t'), b = $('#nv-loc-s');
+  if (!n || !a) return;
+  [a.textContent, b.textContent] = nvLocTexts(n);
+}
 function renderNuevo() {
   const el = $('#s-nuevo');
+  if (S.nvTab === 'mis') { renderMisRegistros(); return; }
   const n = nuevoState();
   const dirty = !n.saved && n.photos.length > 0;
-  const head = `<header class="head"><div class="title-row"><a href="#mapa" class="icon-btn" aria-label="Volver al mapa">${I.back}</a><div style="flex:1;min-width:0"><h1>Nuevo Registro (Flora)</h1><span class="muted" style="font-size:13px">${dirty ? 'Si vuelves sin guardar, se descarta lo ingresado' : 'Fotografía una planta y ayúdanos a conocer la biodiversidad'}</span></div>${dirty ? `<button class="nv-discard" data-act="nv-discard" aria-label="Descartar registro y empezar de nuevo">${I.trash}<span>Descartar</span></button>` : ''}</div></header>`;
+  const head = `<header class="head"><div class="title-row"><a href="#mapa" class="icon-btn" aria-label="Volver al mapa">${I.back}</a><div style="flex:1;min-width:0"><h1>Nuevo Registro (Flora)</h1><span class="muted" style="font-size:13px">${dirty ? 'Si vuelves sin guardar, se descarta lo ingresado' : 'Fotografía una planta y ayúdanos a conocer la biodiversidad'}</span></div>${dirty ? `<button class="nv-discard" data-act="nv-discard" aria-label="Descartar registro y empezar de nuevo">${I.trash}<span>Descartar</span></button>` : ''}</div>${nvTabs('nuevo')}</header>`;
   if (n.saved) {
-    el.innerHTML = `${head}<div class="flow center" style="gap:14px"><div class="big-icon">${I.check}</div><h1 style="margin:0;font-size:26px">Observación guardada</h1><p class="muted" style="margin:0;max-width:300px;line-height:1.5">Quedó en tu colección como «${esc(RES[n.result.status].tag.toLowerCase())}».</p>
-      <div style="align-self:stretch;display:flex;flex-direction:column;gap:8px;margin-top:16px"><a class="btn" href="#coleccion">Ver mis observaciones</a><button class="btn light" data-act="nv-reset">Registrar otra</button></div></div>`;
+    const later = !n.result;
+    el.innerHTML = `${head}<div class="flow center" style="gap:14px"><div class="big-icon">${I.check}</div><h1 style="margin:0;font-size:26px">Observación guardada</h1><p class="muted" style="margin:0;max-width:300px;line-height:1.5">${later ? `Quedó en Mis Registros como «sin identificar». ${settings.token ? 'La IA de iNaturalist la identificará automáticamente.' : 'Agrega tu token de iNaturalist en Ajustes para que la IA la identifique.'}` : `Quedó en Mis Registros como «${esc(RES[n.result.status].tag.toLowerCase())}».`}</p>
+      <div style="align-self:stretch;display:flex;flex-direction:column;gap:8px;margin-top:16px"><button class="btn" data-nvtab="mis">Ver mis registros</button><button class="btn light" data-act="nv-reset">Registrar otra</button></div></div>`;
     return;
   }
   if (!n.photos.length) {
     el.innerHTML = `${head}<div class="flow">
       <div class="nv-empty">${I.cam}<b>Empieza con una foto</b><span>Fotografía una planta que no aparece en el mapa. Incluye flor, hoja o fruto si es posible.</span></div>
-      <div class="two"><label class="btn">${I.cam}Tomar foto<input type="file" accept="image/*" capture="environment" class="sr" data-photo-input="nuevo"></label><label class="btn light">${I.img}Galería<input type="file" accept="image/*" multiple class="sr" data-photo-input="nuevo"></label></div></div>`;
+      <div class="two"><label class="btn">${I.cam}Tomar foto<input type="file" accept="image/*" capture="environment" class="sr" data-photo-input="nuevo" data-src="cam"></label><label class="btn light">${I.img}Galería<input type="file" accept="image/*" multiple class="sr" data-photo-input="nuevo" data-src="gal"></label></div>
+      <span class="muted" style="font-size:13px;line-height:1.45">Con la cámara se usa tu ubicación actual; desde la galería, la ubicación guardada en la foto. Después puedes ajustarla en el mapa.</span></div>`;
     return;
   }
   const main = n.photos[n.main] || n.photos[0];
-  const r = n.result ? RES[n.result.status] : null;
+  const later = n.mode === 'later';
+  const r = !later && n.result ? RES[n.result.status] : null;
   const isSel = (t) => n.sel && n.sel.taxon.id === t.id;
   const recent = n.recent = recentTaxa();
-  const matchBtn = (m, i) => `<button class="nv-match ${isSel(m.taxon) ? 'on' : ''}" data-nv-pick="${i}">${thumb(photoUrl(m.taxon.default_photo, 'square'), 'sm')}<span class="info"><b class="sci">${esc(m.taxon.name)}</b><span>${esc(cap(m.taxon.preferred_common_name) || m.note || '')}</span>${m.pct != null ? `<span class="bar"><i style="width:${m.pct}%"></i></span>` : `<span class="muted" style="font-size:11px">${esc(m.note || '')}</span>`}</span>${m.pct != null ? `<b class="pct">${m.pct}%</b>` : ''}</button>`;
-  const chosen = n.sel ? `<div class="muted" style="font-size:12px;font-weight:700">Especie elegida</div><div class="nv-match on">${thumb(photoUrl(n.sel.taxon.default_photo, 'square'), 'sm')}<span class="info"><b class="sci">${esc(n.sel.taxon.name)}</b><span>${esc(cap(n.sel.taxon.preferred_common_name) || n.sel.note || '')}</span></span>${n.sel.pct != null ? `<b class="pct">${n.sel.pct}%</b>` : ''}</div>` : '';
-  const matches = n.mode === 'cat'
-    ? `${chosen}<div class="search">${I.search}<label for="cat" class="sr">Buscar en el catálogo oficial</label><input id="cat" type="search" placeholder="Nombre común, científico o tu alias" value="${esc(n.q)}" autocomplete="off"></div><div id="cat-res"></div>`
-    : (n.analyzing ? '<div class="state" style="padding:12px"><div class="spinner"></div>Buscando coincidencias…</div>'
-      : (n.ai || []).map(matchBtn).join('')
-        + (n.usedAI ? '' : '<div class="muted" style="font-size:12px;line-height:1.4">Sin token de iNaturalist, la app sugiere las especies con más registros cerca. Actívalo en Ajustes para reconocer la foto.</div>'));
-  const locTxt = n.lat != null ? `${n.lat.toFixed(5)}, ${n.lng.toFixed(5)}` : 'Sin elegir · tócala en el mapa';
-  const ready = r && !n.classifying && n.lat != null;
-  const why = n.lat == null ? 'Elige en el mapa dónde tomaste la foto.' : !n.sel ? 'Elige la especie para poder guardar.' : '';
+  const chosen = n.sel ? `<div class="muted" style="font-size:12px;font-weight:700">Especie elegida</div><div class="nv-match on">${thumb(photoUrl(n.sel.taxon.default_photo, 'square'), 'sm')}<span class="info"><b class="sci">${esc(n.sel.taxon.name)}</b><span>${esc(cap(n.sel.taxon.preferred_common_name) || n.sel.note || '')}</span></span></div>` : '';
+  const ident = later
+    ? `<div class="nv-later">${I.ai}<span><b>Se guardará como «Sin identificar»</b>${settings.token ? 'En Mis Registros la IA de iNaturalist la identifica automáticamente y puedes cambiar la especie si no es correcta.' : 'En Mis Registros la IA la identifica automáticamente cuando agregues tu token de iNaturalist en Ajustes.'}</span></div>`
+    : `${recent.length ? `<div class="nv-recent"><span class="nv-recent-k">Registradas hace poco · toca para elegir</span><div class="nv-recent-row">${recent.map((t, i) => `<button class="${isSel(t) ? 'on' : ''}" data-nv-recent="${i}" aria-label="Elegir ${esc(cap(t.preferred_common_name) || t.name)}"><span class="ph" style="background-image:url('${esc(photoUrl(t.default_photo, 'square'))}')">${isSel(t) ? I.check : ''}</span><b>${esc(cap(t.preferred_common_name) || t.name)}</b><i class="sci">${esc(t.name)}</i></button>`).join('')}</div></div>` : ''}
+      <div class="nv-matches">${chosen}<div class="search">${I.search}<label for="cat" class="sr">Buscar en el catálogo oficial</label><input id="cat" type="search" placeholder="Buscar especie: nombre común, científico o alias" value="${esc(n.q)}" autocomplete="off"></div><div id="cat-res"></div></div>`;
+  const [locT, locS] = nvLocTexts(n);
+  const ready = n.lat != null && (later || (r && !n.classifying));
+  const why = n.lat == null ? 'Marca en el mapa dónde tomaste la foto.' : !later && !n.sel ? 'Elige la especie o toca «Identificar después».' : '';
   el.innerHTML = `${head}<div class="flow nv">
     <div class="nv-hero" style="background-image:url('${main.preview}')"><button class="nv-edit nv-edit-del" data-nv-del="${n.main}" aria-label="Eliminar esta foto">${I.trash}</button><button class="nv-edit" data-act="nv-replace-photo" aria-label="Cambiar foto principal">${I.edit}</button></div>
     <div class="nv-strip">${n.photos.map((p, i) => `<div class="nv-th"><button class="${i === n.main ? 'on' : ''}" data-nv-main="${i}" aria-label="Foto ${i + 1}" style="background-image:url('${p.preview}')"></button><button class="nv-del" data-nv-del="${i}" aria-label="Eliminar la foto ${i + 1}">${I.x}</button></div>`).join('')}${n.photos.length < 9 ? '<button class="nv-add" data-act="nv-add-photo"><b>+</b><span>Agregar fotos</span></button>' : ''}</div>
-    <div class="nv-row ${n.lat == null ? 'need' : ''}">${I.pin}<span class="info"><b>Ubicación${n.photos.length > 1 ? ` · foto ${n.main + 1}` : ''}</b><span>${locTxt}</span></span><button class="chip-btn" data-act="nv-pick-loc">${n.lat == null ? 'Elegir en el mapa' : 'Cambiar'}</button></div>
+    <div class="nv-row ${n.lat == null ? 'need' : ''}">${I.pin}<span class="info"><b id="nv-loc-t">${esc(locT)}</b><span id="nv-loc-s">${esc(locS)}</span></span><button class="chip-btn" data-act="nv-map-big" id="nv-map-big">${n.mapBig ? 'Reducir' : 'Cambiar'}</button></div>
+    <div id="nv-map-slot"></div>
+    <span class="nv-map-hint">Toca el mapa o arrastra la foto para ajustar la ubicación${n.photos.length > 1 ? '. Cada foto tiene la suya: elige la foto arriba o su número en el mapa.' : '.'}</span>
     <div class="nv-row">${I.cal}<span class="info"><b>Fecha y hora</b><span>${esc(fmtWhen(n.when))}</span></span><button class="chip-btn" data-act="nv-edit-when">${n.editWhen ? 'Listo' : 'Editar'}</button></div>
     ${n.editWhen ? `<div class="nv-edit-box"><div class="field"><label for="nv-when">Fecha y hora de la observación</label><input id="nv-when" type="datetime-local" value="${esc(n.when)}"></div></div>` : ''}
     <b class="nv-sec">Identificar especie</b>
-    ${recent.length ? `<div class="nv-recent"><span class="nv-recent-k">Registradas hace poco · toca para elegir</span><div class="nv-recent-row">${recent.map((t, i) => `<button class="${isSel(t) ? 'on' : ''}" data-nv-recent="${i}" aria-label="Elegir ${esc(cap(t.preferred_common_name) || t.name)}"><span class="ph" style="background-image:url('${esc(photoUrl(t.default_photo, 'square'))}')">${isSel(t) ? I.check : ''}</span><b>${esc(cap(t.preferred_common_name) || t.name)}</b><i class="sci">${esc(t.name)}</i></button>`).join('')}</div></div>` : ''}
-    <div class="nv-modes"><button class="${n.mode === 'cat' ? 'on' : ''}" data-act="nv-mode-cat">${I.book}Buscar en catálogo</button><button class="${n.mode === 'ia' ? 'on' : ''}" data-act="nv-mode-ia">${I.ai}Sugerir con IA</button></div>
-    <div class="nv-matches">${matches}</div>
-    ${n.classifying ? '<div class="state" style="padding:8px"><div class="spinner"></div>Comparando con registros de GBIF e iNaturalist…</div>'
+    <div class="nv-modes"><button class="${!later ? 'on' : ''}" data-act="nv-mode-cat">${I.book}Buscar en catálogo</button><button class="${later ? 'on' : ''}" data-act="nv-mode-later">${I.ai}Identificar después</button></div>
+    ${ident}
+    ${later ? '' : n.classifying ? '<div class="state" style="padding:8px"><div class="spinner"></div>Comparando con registros de GBIF e iNaturalist…</div>'
       : r ? `<div class="nv-status" style="--sb:${r.bg};--sf:${r.fg}"><i>${I[r.icon]}</i><span><b>${r.tag}</b>${n.result.status === 'validada' ? `Hay ${nf(n.result.near)} registros de esta especie en un radio de ${S.radius} km.` : n.result.status === 'nuevo_local' ? `No hay registros de esta especie en un radio de ${S.radius} km. ¡Podrías ser la primera persona en registrarla en esta zona!` : r.body}</span></div>` : ''}
     <div class="field"><label for="notas">Notas de campo</label><textarea id="notas" rows="2" placeholder="Hábitat, número de individuos, fenología…">${esc(n.notes)}</textarea></div>
     <button class="btn ghost nv-discard-b" data-act="nv-discard">${I.trash}Descartar y empezar de nuevo</button>
     <div class="nv-savebar">${why ? `<span>${why}</span>` : ''}<button class="btn nv-save" data-act="nv-save" ${ready ? '' : 'disabled'}>${I.check}Guardar observación</button></div></div>`;
-  if (n.mode === 'cat') {
+  mountNvMap();
+  if (!later) {
     $('#cat').addEventListener('input', (e) => { n.q = e.target.value; clearTimeout(n.qt); n.qt = setTimeout(catalogSearch, 300); });
     if (n.q) catalogSearch();
   }
   $('#notas').addEventListener('input', (e) => { n.notes = e.target.value; });
   $('#nv-when')?.addEventListener('change', (e) => { if (e.target.value) n.when = e.target.value; });
+}
+// Mapa del registro: queda en la pantalla (se reubica tras cada redibujo) para no perder zoom ni teselas.
+let nvMap = null, nvMapEl = null, nvLayer = null, nvMe = null;
+function mountNvMap() {
+  const slot = $('#nv-map-slot'), n = S.nuevo;
+  if (!slot || !n) return;
+  if (!nvMapEl) {
+    nvMapEl = document.createElement('div');
+    nvMapEl.className = 'nv-map';
+    nvMapEl.innerHTML = `<div class="nv-map-in"></div><button class="nv-map-me" data-act="nv-loc-me" aria-label="Usar mi ubicación actual para esta foto">${I.target}</button>`;
+    slot.appendChild(nvMapEl);
+    nvMap = L.map(nvMapEl.firstChild, { zoomControl: false, attributionControl: false, zoomSnap: 0.25 }).setView([S.pos.lat, S.pos.lng], 16);
+    (settings.layer === 'topo' ? L.tileLayer(TILE_URLS.topo, { maxZoom: 19, crossOrigin: true }) : L.layerGroup([L.tileLayer(TILE_URLS.sat, { maxZoom: 19, crossOrigin: true }), L.tileLayer(TILE_URLS.lbl, { maxZoom: 19, opacity: 0.8, crossOrigin: true })])).addTo(nvMap);
+    nvMe = L.marker([S.pos.lat, S.pos.lng], { icon: avatarIcon(), interactive: false, zIndexOffset: -100 }).addTo(nvMap);
+    nvLayer = L.layerGroup().addTo(nvMap);
+    nvMap.on('click', (e) => setNvPhotoLoc(e.latlng.lat, e.latlng.lng, 'mapa'));
+  } else slot.appendChild(nvMapEl);
+  nvMapEl.classList.toggle('big', !!n.mapBig);
+  const center = nvMapEl.dataset.uid !== n.uid || nvMapEl.dataset.main !== String(n.main);
+  nvMapEl.dataset.uid = n.uid; nvMapEl.dataset.main = n.main;
+  setTimeout(() => { nvMap.invalidateSize(); refreshNvMap(center); }, 0);
+}
+function refreshNvMap(center) {
+  const n = S.nuevo;
+  if (!nvMap || !n) return;
+  nvLayer.clearLayers();
+  nvMe.setLatLng([S.pos.lat, S.pos.lng]).setIcon(avatarIcon());
+  n.photos.forEach((p, i) => {
+    if (!hasLoc(p)) return;
+    if (i === n.main) {
+      // La foto elegida es un pin con su imagen que se puede arrastrar.
+      const m = L.marker([p.lat, p.lng], { draggable: true, autoPan: true, zIndexOffset: 1000, icon: L.divIcon({ className: '', html: `<div class="pin" style="--rc:#1F6B48"><div class="pm" style="background-image:url('${p.preview}')"></div></div>`, iconSize: [40, 48], iconAnchor: [20, 48] }) });
+      m.on('dragend', () => { const ll = m.getLatLng(); setNvPhotoLoc(ll.lat, ll.lng, 'mapa'); });
+      nvLayer.addLayer(m);
+    } else {
+      const m = L.marker([p.lat, p.lng], { icon: L.divIcon({ className: '', html: `<div class="nv-dot">${i + 1}</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }), title: `Foto ${i + 1}` });
+      m.on('click', () => { n.main = i; nuevoLocChanged(true); });
+      nvLayer.addLayer(m);
+    }
+  });
+  const p = n.photos[n.main];
+  if (center) nvMap.setView(hasLoc(p) ? [p.lat, p.lng] : [S.pos.lat, S.pos.lng], Math.max(nvMap.getZoom(), 16), { animate: false });
+}
+function setNvPhotoLoc(lat, lng, src) {
+  const n = S.nuevo, p = n?.photos[n.main];
+  if (!p) return;
+  Object.assign(p, { lat, lng, src });
+  sfx('pop');
+  nuevoLocChanged(false);
+}
+// Recalcula la ubicación del registro, su nombre de lugar y la validación si cambió.
+function nuevoLocChanged(render) {
+  const n = S.nuevo;
+  if (!n) return;
+  const moved = syncNuevoLoc(n);
+  if (moved) { n.place = ''; nuevoPlace(); }
+  if (moved && n.sel && n.mode !== 'later') nuevoClassify();
+  else if (render) renderNuevo();
+  else { refreshNvMap(false); updateNvLoc(); }
+}
+function nuevoPlace() {
+  const n = S.nuevo;
+  if (!n || n.lat == null) return;
+  const { lat, lng } = n;
+  placeName(lat, lng).then((name) => { if (S.nuevo !== n || n.lat !== lat || n.lng !== lng) return; n.place = name; updateNvLoc(); });
+}
+// Nombre del lugar (comuna y región) para unas coordenadas; sin conexión queda vacío y se muestran las coordenadas.
+const placeCache = new Map();
+async function placeName(lat, lng) {
+  const k = `${lat.toFixed(3)},${lng.toFixed(3)}`;
+  if (placeCache.has(k)) return placeCache.get(k);
+  let name = '';
+  try {
+    const r = await getJSON(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?f=json&langCode=es&location=${lng},${lat}`);
+    const a = r.address || {};
+    name = [...new Set([a.City || a.Subregion || a.Neighborhood, a.Region].filter(Boolean))].join(', ');
+  } catch { /* sin conexión */ }
+  if (name) placeCache.set(k, name);
+  return name;
+}
+// Tu ubicación actual: GPS si está disponible (o la del avatar en modo prueba).
+function currentLoc() {
+  return new Promise((res) => {
+    const fb = () => res({ lat: S.pos.lat, lng: S.pos.lng });
+    if (settings.demo || !navigator.geolocation) { fb(); return; }
+    navigator.geolocation.getCurrentPosition((p) => res({ lat: p.coords.latitude, lng: p.coords.longitude }), fb, { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 });
+  });
+}
+// Lee del EXIF de la foto (JPEG) las coordenadas GPS y la fecha en que se tomó, si las trae.
+async function photoMeta(file) {
+  try {
+    const v = new DataView(await file.slice(0, 256 * 1024).arrayBuffer());
+    if (v.getUint16(0) !== 0xFFD8) return {};
+    let o = 2;
+    while (o + 10 < v.byteLength) {
+      const mk = v.getUint16(o);
+      if ((mk & 0xFF00) !== 0xFF00 || mk === 0xFFDA) break;
+      if (mk === 0xFFE1 && v.getUint32(o + 4) === 0x45786966) return exifMeta(v, o + 10);
+      o += 2 + v.getUint16(o + 2);
+    }
+  } catch { /* sin datos legibles */ }
+  return {};
+}
+function exifMeta(v, t) {
+  const le = v.getUint16(t) === 0x4949;
+  const u16 = (q) => v.getUint16(t + q, le), u32 = (q) => v.getUint32(t + q, le);
+  const ifd = (q) => { const out = {}; const k = u16(q); for (let i = 0; i < k; i++) { const e = q + 2 + i * 12; out[u16(e)] = { type: u16(e + 2), count: u32(e + 4), at: e + 8 }; } return out; };
+  const rat = (q) => u32(q) / (u32(q + 4) || 1);
+  const chr = (en) => String.fromCharCode(v.getUint8(t + en.at));
+  const str = (en) => { const q = en.count > 4 ? u32(en.at) : en.at; let x = ''; for (let i = 0; i < en.count - 1; i++) x += String.fromCharCode(v.getUint8(t + q + i)); return x; };
+  const out = {};
+  const ifd0 = ifd(u32(4));
+  if (ifd0[0x8769]) {
+    const ex = ifd(u32(ifd0[0x8769].at));
+    const d = ex[0x9003] || ex[0x9004];
+    const m = d && str(d).match(/^(\d{4}):(\d\d):(\d\d) (\d\d):(\d\d)/);
+    if (m) out.when = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}`;
+  }
+  if (ifd0[0x8825]) {
+    const g = ifd(u32(ifd0[0x8825].at));
+    const dms = (en) => { const q = u32(en.at); return rat(q) + rat(q + 8) / 60 + rat(q + 16) / 3600; };
+    if (g[2] && g[4]) {
+      let lat = dms(g[2]), lng = dms(g[4]);
+      if (g[1] && chr(g[1]) === 'S') lat = -lat;
+      if (g[3] && chr(g[3]) === 'W') lng = -lng;
+      if (Number.isFinite(lat) && Number.isFinite(lng) && (lat || lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) Object.assign(out, { lat, lng });
+    }
+  }
+  return out;
 }
 // Especies de tus registros y capturas más recientes (sin repetir), para elegirlas con un toque.
 function recentTaxa() {
@@ -1440,8 +1590,8 @@ function nuevoDiscard(ask) {
 function openPhotoSource(how) {
   const input = how === 'replace' ? 'nuevo-replace' : 'nuevo';
   openModal(`<div class="top"><h2>${how === 'replace' ? 'Cambiar foto principal' : 'Agregar fotos'}</h2><button class="x" data-act="modal-close" aria-label="Cerrar">${I.x}</button></div>
-    <div class="two"><label class="btn">${I.cam}Cámara<input type="file" accept="image/*" capture="environment" class="sr" data-photo-input="${input}"></label><label class="btn light">${I.img}Galería<input type="file" accept="image/*" ${how === 'replace' ? '' : 'multiple'} class="sr" data-photo-input="${input}"></label></div>
-    <span class="muted" style="font-size:13px">Después eliges en el mapa dónde la tomaste.</span>`);
+    <div class="two"><label class="btn">${I.cam}Cámara<input type="file" accept="image/*" capture="environment" class="sr" data-photo-input="${input}" data-src="cam"></label><label class="btn light">${I.img}Galería<input type="file" accept="image/*" ${how === 'replace' ? '' : 'multiple'} class="sr" data-photo-input="${input}" data-src="gal"></label></div>
+    <span class="muted" style="font-size:13px;line-height:1.45">Con la cámara se usa tu ubicación actual; desde la galería, la que trae la foto. Puedes ajustarla en el mapa.</span>`);
 }
 async function catalogSearch() {
   const n = S.nuevo, box = $('#cat-res');
@@ -1467,42 +1617,30 @@ async function catalogSearch() {
   }
 }
 // Agrega fotos o reemplaza la principal; luego la persona marca en el mapa dónde las tomó.
-async function onNuevoPhoto(files, how) {
+async function onNuevoPhoto(files, how, src) {
   const n = nuevoState();
   const list = [...files].slice(0, 8);
+  const hereP = currentLoc();
   const items = [];
-  for (const f of list) { try { items.push({ file: f, preview: await shrink(f) }); } catch { /* imagen no legible */ } }
+  let noGps = 0, fromPhoto = 0;
+  for (const f of list) {
+    let preview;
+    try { preview = await shrink(f); } catch { continue; }
+    // Cámara: tu ubicación actual. Galería: la guardada en la foto (o la actual si no trae).
+    const meta = src === 'cam' ? {} : await photoMeta(f);
+    const p = { file: f, preview };
+    if (hasLoc(meta)) { Object.assign(p, { lat: meta.lat, lng: meta.lng, src: 'foto' }); fromPhoto++; }
+    else { Object.assign(p, await hereP, { src: src === 'cam' ? 'gps' : 'actual' }); if (src !== 'cam') noGps++; }
+    if (meta.when && !n.photos.length && !items.length) n.when = meta.when;
+    items.push(p);
+  }
+  if (S.nuevo !== n) return;
   if (!items.length) { toast('No se pudo leer la imagen.'); return; }
   if (how === 'replace' && n.photos.length) n.photos[n.main] = items[0];
-  else n.photos.push(...items);
-  if (how !== 'replace') n.main = n.photos.length - items.length;
-  syncNuevoLoc(n); renderNuevo();
-  const ll = await pickLocation({ photo: items[0].preview, count: items.length, prev: n.lat != null ? [n.lat, n.lng] : null });
-  if (S.nuevo !== n) return;
-  if (ll) items.forEach((p) => { p.lat = ll.lat; p.lng = ll.lng; });
-  else toast('Fotos agregadas sin ubicación. Toca «Elegir en el mapa» para marcarla.');
-  if (syncNuevoLoc(n) && n.sel) nuevoClassify(); else renderNuevo();
-}
-// Cambia la ubicación de la foto principal desde el mapa.
-async function nuevoPickLoc() {
-  const n = S.nuevo, p = n.photos[n.main];
-  const ll = await pickLocation({ photo: p.preview, count: 1, prev: n.lat != null ? [n.lat, n.lng] : null });
-  if (!ll || S.nuevo !== n) return;
-  p.lat = ll.lat; p.lng = ll.lng;
-  if (syncNuevoLoc(n) && n.sel) nuevoClassify(); else renderNuevo();
-}
-async function nuevoIdentify() {
-  const n = S.nuevo;
-  n.analyzing = true; renderNuevo();
-  let m = null;
-  try { m = await computerVision(n.photos[n.main].file, n.lat ?? S.pos.lat, n.lng ?? S.pos.lng); } catch { toast('La IA de iNaturalist no respondió (¿token vencido?).'); }
-  n.usedAI = !!m?.length;
-  if (!n.usedAI) m = S.species.filter((s) => s.inatId).slice().sort((a, b) => b.inatCount - a.inatCount).slice(0, 4)
-    .map((s) => ({ taxon: { id: s.inatId, name: s.sci, preferred_common_name: s.common, default_photo: { square_url: s.photo } }, pct: null, note: `${nf(s.inatCount)} obs. cerca` }));
-  n.ai = m; n.analyzing = false;
-  if (S.nuevo !== n) return;
-  if (!n.sel && m.length) n.sel = m[0];
-  nuevoClassify();
+  else { n.photos.push(...items); n.main = n.photos.length - items.length; }
+  if (noGps) toast(items.length === 1 ? 'La foto no trae ubicación: se usó tu ubicación actual. Ajústala en el mapa si hace falta.' : `${noGps} foto${noGps === 1 ? '' : 's'} sin ubicación: se usó tu ubicación actual.`);
+  else if (fromPhoto) toast(fromPhoto === 1 ? 'Ubicación tomada de la foto' : 'Ubicaciones tomadas de las fotos');
+  nuevoLocChanged(true);
 }
 async function nuevoClassify() {
   const n = S.nuevo;
@@ -1517,70 +1655,194 @@ async function nuevoClassify() {
   if (route().name === 'nuevo') renderNuevo();
 }
 function nuevoSave() {
-  const n = S.nuevo, t = n.sel.taxon;
-  addToCollection({ uid: n.uid, id: String(t.id), taxonId: t.id, sci: t.name, common: cap(t.preferred_common_name), photo: photoUrl(t.default_photo, 'square'), userPhoto: n.photos[n.main].preview, photos: n.photos.length, photoLocs: n.photos.map((p) => (hasLoc(p) ? [p.lat, p.lng] : null)), status: n.result.status, conf: n.sel.pct, notes: n.notes, date: n.when.slice(0, 10), when: n.when, lat: n.lat, lng: n.lng, kind: 'nuevo', pendingSync: !!n.result.offline });
+  const n = S.nuevo, later = n.mode === 'later' || !n.sel || !n.result;
+  const base = { uid: n.uid, userPhoto: n.photos[n.main].preview, photos: n.photos.length, photoLocs: n.photos.map((p) => (hasLoc(p) ? [p.lat, p.lng] : null)), notes: n.notes, date: n.when.slice(0, 10), when: n.when, lat: n.lat, lng: n.lng, place: n.place || '', kind: 'nuevo' };
+  if (later) {
+    addToCollection(Object.assign(base, { id: '', taxonId: null, sci: '', common: '', photo: '', status: 'sin_identificar' }));
+    n.result = null;
+  } else {
+    const t = n.sel.taxon;
+    addToCollection(Object.assign(base, { id: String(t.id), taxonId: t.id, sci: t.name, common: cap(t.preferred_common_name), photo: photoUrl(t.default_photo, 'square'), status: n.result.status, conf: n.sel.pct, idBy: 'catalogo', pendingSync: !!n.result.offline }));
+  }
   n.saved = true; renderNuevo();
   // Registrar algo tú mismo vale un extra de +20 XP sobre la recompensa por resultado.
   sfx('badge');
-  setTimeout(() => addXP((STATUS_XP[n.result.status] || 0) + 20, 'nuevo registro'), 500);
+  setTimeout(() => addXP((later ? 0 : STATUS_XP[n.result.status] || 0) + 20, 'nuevo registro'), 500);
   checkBadges(null);
+  if (later) setTimeout(autoIdentify, 800);
 }
 
-/* ---------- elegir ubicación en el mapa ---------- */
-// Mapa a pantalla completa que parte desde tu ubicación: mueves el mapa hasta dejar el alfiler donde tomaste la foto.
-// Usa las mismas teselas que el mapa principal, así que funciona sin señal en una zona guardada.
-let lpMap = null, lpMe = null, lpPrev = null, lpDone = null, lpMoved = false, lpStart = null;
-function pickLocation({ photo, count, prev }) {
-  return new Promise((resolve) => {
-    lpDone = resolve; lpMoved = false;
-    lpStart = [S.pos.lat, S.pos.lng];
-    let el = $('#locpick');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'locpick'; el.className = 'locpick';
-      el.innerHTML = `<header><button class="icon-btn" data-act="lp-cancel" aria-label="Cerrar sin elegir">${I.x}</button><span class="lp-ph" id="lp-ph"></span><div><b id="lp-title"></b><span>Mueve el mapa hasta dejar el alfiler donde la tomaste</span></div></header>
-        <div class="lp-map"><div id="lp-map"></div><span class="lp-pin" aria-hidden="true">${I.pin}</span></div>
-        <footer><div class="lp-coords" id="lp-coords" aria-live="polite"></div><button class="btn light" data-act="lp-me">${I.target}Ir a mi ubicación</button><button class="btn nv-save" data-act="lp-ok">${I.check}Confirmar ubicación</button></footer>`;
-      $('#phone').appendChild(el);
+/* ---------- mis registros ---------- */
+// Lista de tus nuevos registros: filtros, orden, selección para eliminar o exportar, e identificación con IA.
+const aiNow = new Set(), aiTried = new Set(), placeTried = new Set();
+let aiBusy = false, placeBusy = false;
+const recDate = (o) => (o.when ? new Date(o.when).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' }) : o.date || '');
+const recName = (o) => (o.taxonId ? o.common || o.sci : 'Sin identificar');
+const refreshMis = () => { if (route().name === 'nuevo' && S.nvTab === 'mis') renderMisRegistros(); };
+function renderMisRegistros() {
+  const el = $('#s-nuevo');
+  const f = S.misF || 'todas', sort = S.misSort || 'reciente';
+  const sel = S.misSel || (S.misSel = new Set());
+  const all = S.collection.filter((o) => o.kind === 'nuevo');
+  const tm = (o) => o.when || o.date || '';
+  const rows = all.filter((o) => f === 'todas' || (f === 'ident' ? o.taxonId : !o.taxonId))
+    .sort(sort === 'antiguo' ? (a, b) => tm(a).localeCompare(tm(b)) : sort === 'nombre' ? (a, b) => (a.taxonId ? recName(a) : '~').localeCompare(b.taxonId ? recName(b) : '~', 'es') : (a, b) => tm(b).localeCompare(tm(a)));
+  for (const u of [...sel]) if (!rows.some((o) => o.uid === u)) sel.delete(u);
+  const nSel = sel.size;
+  const pending = all.filter((o) => !o.taxonId).length;
+  const st = (o) => aiNow.has(o.uid) ? '<span class="mr-st ai"><i class="spin-s"></i>IA identificando…</span>'
+    : o.taxonId ? `<span class="mr-st ok">Identificada${o.idBy === 'ia' && o.conf != null ? ` · IA ${o.conf}%` : ''}</span>` : '<span class="mr-st no">Sin identificar</span>';
+  const row = (o) => `<div class="mr-row ${sel.has(o.uid) ? 'on' : ''}"><label class="mr-ck"><input type="checkbox" data-mr-ck="${esc(o.uid)}" ${sel.has(o.uid) ? 'checked' : ''} aria-label="Seleccionar ${esc(recName(o))}"></label>
+    <span class="mr-ph" style="background-image:url('${esc(o.userPhoto || o.photo)}')"></span>
+    <div class="info"><b>${esc(recName(o))}</b>${o.taxonId && o.common ? `<i class="sci">${esc(o.sci)}</i>` : ''}<span>${I.cal}${esc(recDate(o))}</span><span>${I.pin}${esc(o.place || (o.lat != null ? `${o.lat.toFixed(4)}, ${o.lng.toFixed(4)}` : 'Sin ubicación'))}</span>${st(o)}</div>
+    <button class="mr-more" data-mr-more="${esc(o.uid)}" aria-label="Opciones de ${esc(recName(o))}">⋮</button></div>`;
+  const hint = !pending ? '' : !settings.token ? `<div class="mr-hint">${I.ai}<span>La IA identifica sola tus registros «Sin identificar». Para activarla agrega tu token de iNaturalist en <button data-act="open-settings">Ajustes</button>.</span></div>`
+    : !navigator.onLine ? `<div class="mr-hint">${I.ai}<span>Sin conexión: la IA identificará tus registros al volver la señal.</span></div>` : '';
+  el.innerHTML = `<header class="head"><div class="title-row"><a href="#mapa" class="icon-btn" aria-label="Volver al mapa">${I.back}</a><div style="flex:1;min-width:0"><h1>Mis Registros</h1><span class="muted" style="font-size:13px">${nf(all.length)} registro${all.length === 1 ? '' : 's'}${pending ? ` · ${nf(pending)} sin identificar` : ''}</span></div></div>${nvTabs('mis')}
+    <div class="mr-filters">${[['todas', 'Todas'], ['ident', 'Identificadas'], ['sin', 'Sin identificar']].map(([id, l]) => `<button class="rad ${f === id ? 'on' : ''}" data-mrf="${id}" aria-pressed="${f === id}">${l}</button>`).join('')}</div>
+    <div class="mr-tools"><label class="mr-ck"><input type="checkbox" data-mr-all="1" ${rows.length && nSel === rows.length ? 'checked' : ''} aria-label="Seleccionar todos"></label><span>Ordenar por:</span><select id="mr-sort" aria-label="Ordenar registros"><option value="reciente" ${sort === 'reciente' ? 'selected' : ''}>Más recientes</option><option value="antiguo" ${sort === 'antiguo' ? 'selected' : ''}>Más antiguos</option><option value="nombre" ${sort === 'nombre' ? 'selected' : ''}>Nombre (A-Z)</option></select></div></header>
+    <div class="flow mr">${hint}${rows.length ? rows.map(row).join('') : `<div class="state">${all.length ? 'No hay registros con este filtro.' : 'Aún no tienes registros. Toca «Nuevo Registro» para empezar.'}</div>`}
+    <div class="mr-bar"><button data-act="mr-del" ${nSel ? '' : 'disabled'}>${I.trash}<span>Eliminar<small>(${nSel} seleccionado${nSel === 1 ? '' : 's'})</small></span></button><i></i><button data-act="mr-exp" ${nSel ? '' : 'disabled'}>${I.dl}<span>Exportar<small>(${nSel} seleccionado${nSel === 1 ? '' : 's'})</small></span></button></div></div>`;
+  $('#mr-sort').addEventListener('change', (e) => { S.misSort = e.target.value; renderMisRegistros(); });
+  autoIdentify();
+  fillPlaces();
+}
+// La IA de iNaturalist identifica por defecto los registros guardados sin especie.
+async function autoIdentify(force) {
+  if (aiBusy || !settings.token || !navigator.onLine) return;
+  const todo = force ? [force] : S.collection.filter((o) => o.kind === 'nuevo' && !o.taxonId && !o.aiFail && o.userPhoto && !aiTried.has(o.uid));
+  if (!todo.length) return;
+  aiBusy = true;
+  let ok = 0;
+  for (const o of todo) {
+    aiTried.add(o.uid); aiNow.add(o.uid); refreshMis();
+    try {
+      const blob = await (await fetch(o.userPhoto)).blob();
+      const m = await computerVision(new File([blob], 'foto.jpg', { type: 'image/jpeg' }), o.lat ?? S.pos.lat, o.lng ?? S.pos.lng);
+      if (m?.length) { await setRecordTaxon(o, m[0].taxon, m[0].pct, 'ia', m); ok++; } else o.aiFail = 1;
+    } catch {
+      aiNow.delete(o.uid);
+      toast('La IA de iNaturalist no respondió (¿token vencido?).');
+      break;
     }
-    $('#lp-title').textContent = count > 1 ? `¿Dónde tomaste estas ${count} fotos?` : '¿Dónde tomaste esta foto?';
-    $('#lp-ph').style.backgroundImage = photo ? `url('${photo}')` : '';
-    el.hidden = false;
-    if (!lpMap) {
-      lpMap = L.map('lp-map', { zoomControl: false, attributionControl: false, zoomSnap: 0.25 }).setView(lpStart, 17);
-      (settings.layer === 'topo' ? L.tileLayer(TILE_URLS.topo, { maxZoom: 19, crossOrigin: true }) : L.layerGroup([L.tileLayer(TILE_URLS.sat, { maxZoom: 19, crossOrigin: true }), L.tileLayer(TILE_URLS.lbl, { maxZoom: 19, opacity: 0.8, crossOrigin: true })])).addTo(lpMap);
-      lpMe = L.marker(lpStart, { icon: avatarIcon(), interactive: false }).addTo(lpMap);
-      lpMap.on('move', showPickCoords);
-      lpMap.on('dragstart zoomstart', () => { lpMoved = true; });
-    }
-    lpMe.setLatLng(lpStart).setIcon(avatarIcon());
-    if (lpPrev) { lpPrev.remove(); lpPrev = null; }
-    if (prev) lpPrev = L.circleMarker(prev, { radius: 7, color: '#fff', weight: 2, fillColor: '#C98A12', fillOpacity: 1, interactive: false }).addTo(lpMap);
-    setTimeout(() => { lpMap.invalidateSize(); lpMap.setView(lpStart, 17, { animate: false }); lpMoved = false; showPickCoords(); }, 30);
-    // Con GPS real, centra en tu posición exacta en cuanto llega (si aún no moviste el mapa).
-    if (!settings.demo && navigator.geolocation) navigator.geolocation.getCurrentPosition((p) => {
-      lpStart = [p.coords.latitude, p.coords.longitude];
-      if (lpDone !== resolve) return;
-      lpMe.setLatLng(lpStart);
-      if (!lpMoved) lpMap.setView(lpStart, lpMap.getZoom(), { animate: false });
-    }, () => {}, { enableHighAccuracy: true, timeout: navigator.onLine ? 10000 : 25000 });
-  });
+    aiNow.delete(o.uid);
+    saveCollection(); refreshMis();
+  }
+  aiBusy = false;
+  refreshMis();
+  if (ok) toast(`La IA identificó ${ok} registro${ok === 1 ? '' : 's'}. Si no es la especie, cámbiala con ⋮.`);
+  else if (force && force.aiFail) toast('La IA no encontró coincidencias. Búscala en el catálogo.');
 }
-function showPickCoords() {
-  const c = lpMap.getCenter();
-  $('#lp-coords').textContent = `${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`;
+async function setRecordTaxon(o, t, pct, by, sugs) {
+  Object.assign(o, { id: String(t.id), taxonId: t.id, sci: t.name, common: cap(t.preferred_common_name), photo: photoUrl(t.default_photo, 'square'), conf: pct ?? null, idBy: by });
+  if (sugs) o.aiSug = sugs.slice(0, 4).map((x) => ({ id: x.taxon.id, name: x.taxon.name, common: cap(x.taxon.preferred_common_name), photo: photoUrl(x.taxon.default_photo, 'square'), pct: x.pct }));
+  delete o.aiFail;
+  const was = o.status;
+  try { const r = await classify(t, o.lat, o.lng); o.status = r.status; o.pendingSync = !!r.offline; }
+  catch { o.status = 'nuevo_local'; o.pendingSync = true; }
+  saveCollection();
+  renderPhotoPins();
+  if (was === 'sin_identificar') addXP(STATUS_XP[o.status] || 0, 'registro identificado');
 }
-function pickerToMe() {
-  lpMap.flyTo(lpStart, Math.max(lpMap.getZoom(), 17), { duration: 0.5 });
+async function fillPlaces() {
+  if (placeBusy || !navigator.onLine) return;
+  const todo = S.collection.filter((o) => !o.place && o.lat != null && o.kind === 'nuevo' && !placeTried.has(o.uid));
+  if (!todo.length) return;
+  placeBusy = true;
+  for (const o of todo) { placeTried.add(o.uid); const nm = await placeName(o.lat, o.lng); if (nm) o.place = nm; }
+  placeBusy = false;
+  saveCollection(); refreshMis();
 }
-function closePicker(ok) {
-  const el = $('#locpick');
-  if (!el || el.hidden) return;
-  el.hidden = true;
-  const c = lpMap.getCenter(), done = lpDone;
-  lpDone = null;
-  if (ok) sfx('pop');
-  if (done) done(ok ? { lat: c.lat, lng: c.lng } : null);
+function openRecMenu(uid) {
+  const o = S.collection.find((c) => c.uid === uid);
+  if (!o) return;
+  const sugs = (o.aiSug || []).map((x, i) => `<button class="nv-match ${x.id === o.taxonId ? 'on' : ''}" data-mr-sug="${esc(uid)}:${i}">${thumb(x.photo, 'sm')}<span class="info"><b class="sci">${esc(x.name)}</b><span>${esc(x.common || '')}</span></span><b class="pct">${x.pct}%</b></button>`).join('');
+  openModal(`<div class="top"><h2>${esc(recName(o))}</h2><button class="x" data-act="modal-close" aria-label="Cerrar">${I.x}</button></div>
+    <div class="mini"><span class="mr-ph" style="background-image:url('${esc(o.userPhoto || o.photo)}')"></span><div class="info"><b style="font-size:14px">${esc(recDate(o))}</b><span class="muted" style="font-size:13px">${esc(o.place || '')}</span></div></div>
+    ${sugs ? `<span class="muted" style="font-size:12px;font-weight:700">Sugerencias de la IA · toca para elegir</span><div class="nv-matches">${sugs}</div>` : ''}
+    <div class="menu">
+      <button data-mr-act="cat:${esc(uid)}">${I.book}<span>${o.taxonId ? 'Cambiar especie (catálogo)' : 'Buscar especie en el catálogo'}</span>${I.right}</button>
+      ${settings.token ? `<button data-mr-act="ia:${esc(uid)}">${I.ai}<span>${o.taxonId ? 'Volver a identificar con IA' : 'Identificar con IA ahora'}</span>${I.right}</button>` : ''}
+      ${o.lat != null ? `<button data-mr-act="map:${esc(uid)}">${I.pin}<span>Ver en el mapa</span>${I.right}</button>` : ''}
+      <button data-mr-act="del:${esc(uid)}" style="color:#B3261E">${I.trash}<span>Eliminar registro</span></button>
+    </div>`);
+}
+function openRecCatalog(uid) {
+  S.mrUid = uid; S.mrCat = [];
+  openModal(`<div class="top"><h2>Elegir especie</h2><button class="x" data-act="modal-close" aria-label="Cerrar">${I.x}</button></div>
+    <div class="search">${I.search}<label for="mr-q" class="sr">Buscar especie</label><input id="mr-q" type="search" placeholder="Nombre común, científico o alias" autocomplete="off"></div><div id="mr-res" class="nv-matches"></div>`);
+  let qt;
+  const inp = $('#mr-q');
+  inp.focus();
+  inp.addEventListener('input', () => { clearTimeout(qt); qt = setTimeout(async () => {
+    const raw = inp.value.trim(), box = $('#mr-res');
+    if (!box) return;
+    const mine = aliases.filter((e) => e.inatId && raw && e.names.some((a) => aliasMatch(a, raw))).map((e) => ({ id: e.inatId, name: e.sci, preferred_common_name: e.common, default_photo: { square_url: e.photo } }));
+    let more = [];
+    if (raw.length >= 2) { try { more = (await getJSON(`${INAT}/taxa/autocomplete?q=${encodeURIComponent(raw)}&taxon_id=${PLANTAE}&locale=es&per_page=6`)).results; } catch { more = S.species.filter((s) => s.inatId && (prefixAt(s.common || '', fold(raw)) >= 0 || prefixAt(s.sci, fold(raw)) >= 0)).slice(0, 8).map(offlineTaxon); } }
+    const ids = new Set(mine.map((t) => t.id));
+    S.mrCat = [...mine, ...more.filter((t) => !ids.has(t.id))];
+    box.innerHTML = S.mrCat.map((t, i) => `<button class="nv-match" data-mr-pick="${i}">${thumb(photoUrl(t.default_photo, 'square'), 'sm')}<span class="info"><b class="sci">${esc(t.name)}</b><span>${esc(cap(t.preferred_common_name) || t.rank || '')}</span></span></button>`).join('') || (raw ? '<div class="muted" style="font-size:14px">Sin coincidencias.</div>' : '');
+  }, 300); });
+}
+function confirmRecDelete(uids) {
+  S.mrDel = uids;
+  openModal(`<div class="top"><h2>¿Eliminar ${uids.length === 1 ? 'este registro' : `${uids.length} registros`}?</h2><button class="x" data-act="modal-close" aria-label="Cerrar">${I.x}</button></div>
+    <p style="margin:0;color:var(--ink2);line-height:1.5">Se borran de tu teléfono con sus fotos y notas. No se puede deshacer.</p>
+    <div class="two"><button class="btn light" data-act="modal-close">Cancelar</button><button class="btn" data-act="mr-del-ok" style="background:#B3261E">${I.trash}Eliminar</button></div>`);
+}
+function exportRecords(fmt) {
+  const list = S.collection.filter((o) => S.misSel?.has(o.uid));
+  if (!list.length) return;
+  const name = `mis-registros-${today()}`;
+  let blob;
+  if (fmt === 'kml') {
+    const x = (v) => esc(v ?? '');
+    const pm = list.filter((o) => o.lat != null).map((o) => `<Placemark><name>${x(recName(o))}</name><description>${x([o.sci, recDate(o), o.place, o.notes].filter(Boolean).join(' · '))}</description><Point><coordinates>${o.lng},${o.lat},0</coordinates></Point></Placemark>`).join('');
+    blob = new Blob([`<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Mis registros · Nature Explorer</name>${pm}</Document></kml>`], { type: 'application/vnd.google-earth.kml+xml' });
+  } else {
+    const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const head = ['Nombre común', 'Nombre científico', 'Identificada por', 'Confianza IA (%)', 'Resultado', 'Fecha y hora', 'Latitud', 'Longitud', 'Lugar', 'Fotos', 'Notas'];
+    const lines = list.map((o) => [o.taxonId ? o.common : '', o.sci, o.taxonId ? (o.idBy === 'ia' ? 'IA' : 'Catálogo') : 'Sin identificar', o.idBy === 'ia' ? o.conf : '', o.taxonId ? RES[o.status]?.tag || o.status : '', o.when || o.date, o.lat, o.lng, o.place, o.photos, o.notes].map(q).join(','));
+    blob = new Blob(['﻿' + [head.map(q).join(','), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${name}.${fmt}`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  closeModal();
+  toast(`${list.length} registro${list.length === 1 ? '' : 's'} exportado${list.length === 1 ? '' : 's'} (${fmt.toUpperCase()})`);
+}
+
+/* ---------- tus fotos en el mapa ---------- */
+// Cada captura y nuevo registro queda marcado en el mapa principal donde tomaste sus fotos.
+let photoLayer = null;
+const photoPins = new Map();
+function renderPhotoPins() {
+  if (!map) return;
+  if (!photoLayer) photoLayer = L.layerGroup().addTo(map);
+  photoLayer.clearLayers();
+  photoPins.clear();
+  for (const o of S.collection) {
+    const locs = o.photoLocs?.some(Boolean) ? o.photoLocs.filter(Boolean) : o.lat != null ? [[o.lat, o.lng]] : [];
+    const img = o.userPhoto || o.photo;
+    locs.forEach(([lat, lng], i) => {
+      const m = L.marker([lat, lng], { icon: L.divIcon({ className: '', html: `<div class="ph-pin ${o.kind === 'nuevo' ? 'nuevo' : ''}" style="${img ? `background-image:url('${esc(img)}')` : ''}">${img ? '' : I.cam}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] }), zIndexOffset: 1200, title: recName(o) });
+      m.bindPopup(`<b>${esc(recName(o))}</b><br>${esc(recDate(o))}${o.place ? ` · ${esc(o.place)}` : ''}<br><span style="color:#5B6B64">${o.kind === 'nuevo' ? 'Nuevo registro' : 'Captura'}${locs.length > 1 ? ` · foto ${i + 1} de ${locs.length}` : ''}</span>`, { closeButton: false });
+      if (!i) photoPins.set(o.uid, m);
+      photoLayer.addLayer(m);
+    });
+  }
+}
+// Mantener presionado un punto del mapa (o clic derecho) lleva el avatar ahí.
+function moveAvatarTo(lat, lng) {
+  const wasGps = !settings.demo;
+  if (wasGps) { stopWatch(); settings.demo = true; refreshAvatar(); }
+  selectPoint(null);
+  vibrate(30); sfx('pop');
+  setPos(lat, lng, `${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+  toast(wasGps ? 'Avatar movido aquí. Para volver al GPS: Ajustes › GPS real.' : 'Avatar movido aquí');
 }
 
 /* ---------- colección ---------- */
@@ -1595,7 +1857,7 @@ function renderColeccion() {
   const have = targets.filter((s) => got.has(s.inatId)).length;
   const groups = [
     ['validada', 'Observaciones validadas', 'var(--g700)'], ['nuevo_local', 'Posibles nuevos registros locales', '#C98A12'],
-    ['ampliacion', 'Posibles ampliaciones de distribución', 'var(--blue)'], ['pendiente', 'Pendientes de validar', '#A8460A']
+    ['ampliacion', 'Posibles ampliaciones de distribución', 'var(--blue)'], ['pendiente', 'Pendientes de validar', '#A8460A'], ['sin_identificar', 'Sin identificar (la IA las identifica en Mis Registros)', '#8A948F']
   ];
   const L = levelInfo();
   el.innerHTML = `<header class="head" style="border:none">
@@ -1609,7 +1871,7 @@ function renderColeccion() {
       ${S.loading ? '<div class="state"><div class="spinner"></div></div>' : `<div class="grid3">${targets.map((s) => got.has(s.inatId)
         ? `<a class="cc" href="#ficha/${esc(s.id)}" style="--rc:${rarity(s).color}"><div class="ph" style="background-image:url('${esc(s.photoM)}')"><span class="ok">${I.check}</span></div><div class="t"><b>${esc(s.common || s.sci)}</b><span style="font-size:11px;font-weight:800;color:var(--ink2)">${stars(rarity(s))}</span></div></a>`
         : `<a class="cc lock" href="#ficha/${esc(s.id)}"><div class="ph" style="background-image:url('${esc(s.photo)}')"><span class="lk">❓</span></div><div class="t"><b style="color:var(--muted)">${esc(s.common || s.sci)}</b><span class="muted" style="font-size:11px;font-weight:700">a ${fmtDist(s.dist)}</span></div></a>`).join('')}</div>`}`
-    : (col.length ? groups.map(([st, title, color]) => { const items = by(st); return items.length ? `<section style="margin-bottom:16px"><div style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:${color}"></span><b>${title}</b><span class="muted">${items.length}</span></div>${items.map((o) => `<div class="sp">${thumb(o.userPhoto || o.photo, 'sm')}<div class="info"><span style="font-weight:600">${esc(o.common || o.sci)}</span><span class="sci">${esc(o.sci)}</span><span class="muted" style="font-size:12px">${esc(o.date)}${o.conf != null ? ` · ${o.conf} % IA` : ''} · ${o.kind === 'nuevo' ? 'nuevo registro' : 'captura'}${o.pendingSync ? ' · por verificar' : ''}${o.sim ? ' · DEMO' : ''}</span></div>${st === 'pendiente' ? `<button class="btn" style="height:36px;width:auto;font-size:13px;border-radius:999px" data-revalidate="${esc(o.uid)}">Validar</button>` : `<button class="x" aria-label="Eliminar" data-del="${esc(o.uid)}">${I.x}</button>`}</div>`).join('')}</section>` : ''; }).join('')
+    : (col.length ? groups.map(([st, title, color]) => { const items = by(st); return items.length ? `<section style="margin-bottom:16px"><div style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:${color}"></span><b>${title}</b><span class="muted">${items.length}</span></div>${items.map((o) => `<div class="sp">${thumb(o.userPhoto || o.photo, 'sm')}<div class="info"><span style="font-weight:600">${esc(o.common || o.sci || 'Sin identificar')}</span><span class="sci">${esc(o.sci)}</span><span class="muted" style="font-size:12px">${esc(o.date)}${o.conf != null ? ` · ${o.conf} % IA` : ''} · ${o.kind === 'nuevo' ? 'nuevo registro' : 'captura'}${o.pendingSync ? ' · por verificar' : ''}${o.sim ? ' · DEMO' : ''}</span></div>${st === 'pendiente' ? `<button class="btn" style="height:36px;width:auto;font-size:13px;border-radius:999px" data-revalidate="${esc(o.uid)}">Validar</button>` : `<button class="x" aria-label="Eliminar" data-del="${esc(o.uid)}">${I.x}</button>`}</div>`).join('')}</section>` : ''; }).join('')
       : '<div class="state">Aún no tienes observaciones. Captura una especie desde el mapa.</div>')}</div>`;
 }
 
@@ -2075,8 +2337,9 @@ function show() {
   if (name !== 'nuevo' && S.nuevo) {
     if (!S.nuevo.saved && S.nuevo.photos.length) toast('Registro descartado: no se guardó.');
     S.nuevo = null;
-    closePicker(false);
   }
+  if (name === 'nuevo' && S.lastRoute !== 'nuevo') S.nvTab = 'nuevo';
+  S.lastRoute = name;
   document.querySelectorAll('#tabbar a').forEach((a) => a.classList.toggle('on', a.dataset.tab === name));
   if (name === 'inicio') renderInicio();
   if (name === 'mapa') { initMap(); setTimeout(() => map.invalidateSize(), 50); renderRadii(); renderSheet(); }
@@ -2117,7 +2380,33 @@ document.addEventListener('click', async (e) => {
   if (d.step === 'capturada') playCaptureSound();
   if (d.step) { S.capture.run = (S.capture.run || 0) + 1; S.capture.analyzing = false; S.capture.confirming = false; S.capture.step = d.step; renderCaptura(); return; }
   if (d.pick) { S.capture.pick = Number(d.pick); renderCaptura(); return; }
-  if (d.nvPick) { S.nuevo.sel = S.nuevo.ai[Number(d.nvPick)]; nuevoClassify(); return; }
+  if (d.nvtab) { S.nvTab = d.nvtab; if (d.nvtab === 'nuevo' && S.nuevo?.saved) S.nuevo = null; renderNuevo(); $('#s-nuevo').scrollTop = 0; return; }
+  if (d.mrf) { S.misF = d.mrf; renderMisRegistros(); return; }
+  if (d.mrMore) { openRecMenu(d.mrMore); return; }
+  if (d.mrAct) {
+    const [a, uid] = d.mrAct.split(/:(.*)/s), o = S.collection.find((c) => c.uid === uid);
+    if (!o) return;
+    if (a === 'cat') openRecCatalog(uid);
+    if (a === 'ia') { closeModal(); aiTried.delete(uid); autoIdentify(o); }
+    if (a === 'del') confirmRecDelete([uid]);
+    if (a === 'map') { closeModal(); location.hash = '#mapa'; setTimeout(() => { map.flyTo([o.lat, o.lng], 17, { duration: 0.8 }); setTimeout(() => photoPins.get(uid)?.openPopup(), 900); }, 250); }
+    return;
+  }
+  if (d.mrSug) {
+    const [uid, i] = d.mrSug.split(':'), o = S.collection.find((c) => c.uid === uid), x = o?.aiSug?.[Number(i)];
+    if (!x) return;
+    closeModal();
+    await setRecordTaxon(o, { id: x.id, name: x.name, preferred_common_name: x.common, default_photo: { square_url: x.photo } }, x.pct, 'ia');
+    refreshMis(); toast(`Especie cambiada a ${x.common || x.name}`); return;
+  }
+  if (d.mrPick != null) {
+    const o = S.collection.find((c) => c.uid === S.mrUid), t = S.mrCat[Number(d.mrPick)];
+    if (!o || !t) return;
+    closeModal();
+    await setRecordTaxon(o, t, null, 'catalogo');
+    refreshMis(); toast(`Identificada como ${cap(t.preferred_common_name) || t.name}`); return;
+  }
+  if (d.mrExp) { exportRecords(d.mrExp); return; }
   if (d.nvDel != null) { nuevoDelPhoto(Number(d.nvDel)); return; }
   if (d.nvRecent != null) { const n = S.nuevo, t = n.recent[Number(d.nvRecent)]; n.sel = { taxon: t, pct: null, note: 'Registrada hace poco' }; sfx('pop'); nuevoClassify(); return; }
   if (d.nvMain) { const n = S.nuevo; n.main = Number(d.nvMain); if (syncNuevoLoc(n) && n.sel) nuevoClassify(); else renderNuevo(); return; }
@@ -2130,7 +2419,7 @@ document.addEventListener('click', async (e) => {
   if (d.alSug != null) { const inp = $('#al-in'); inp.value = d.alSug; inp.focus(); return; }
   if (d.alOpen) { closeModal(); location.hash = `#ficha/${d.alOpen}`; return; }
   if (d.coltab) { S.colTab = d.coltab; renderColeccion(); return; }
-  if (d.del) { S.collection = S.collection.filter((c) => c.uid !== d.del); saveCollection(); renderColeccion(); return; }
+  if (d.del) { S.collection = S.collection.filter((c) => c.uid !== d.del); saveCollection(); renderPhotoPins(); renderColeccion(); return; }
   if (d.revalidate) {
     const o = S.collection.find((c) => c.uid === d.revalidate);
     const sp = findSp(o.id) || Object.assign(taxonToSp({ id: o.taxonId, name: o.sci, preferred_common_name: o.common, default_photo: { square_url: o.photo } }), { inatCount: 0, gbifCount: 0 });
@@ -2187,15 +2476,16 @@ document.addEventListener('click', async (e) => {
     case 'modal-close': closeModal(); break;
     case 'ficha-pdf': fichaPdf(); break;
     case 'cap-confirm': confirmCapture(); break;
-    case 'nv-mode-ia': S.nuevo.mode = 'ia'; if (!S.nuevo.ai && !S.nuevo.analyzing) nuevoIdentify(); else renderNuevo(); break;
-    case 'nv-mode-cat': S.nuevo.mode = 'cat'; renderNuevo(); break;
+    case 'nv-mode-later': S.nuevo.mode = 'later'; renderNuevo(); break;
+    case 'nv-mode-cat': S.nuevo.mode = 'cat'; if (S.nuevo.sel && !S.nuevo.result) nuevoClassify(); else renderNuevo(); break;
+    case 'nv-map-big': { const n = S.nuevo; n.mapBig = !n.mapBig; t.textContent = n.mapBig ? 'Reducir' : 'Cambiar'; nvMapEl?.classList.toggle('big', n.mapBig); setTimeout(() => { nvMap?.invalidateSize(); refreshNvMap(true); }, 220); break; }
+    case 'nv-loc-me': currentLoc().then((ll) => { setNvPhotoLoc(ll.lat, ll.lng, 'gps'); refreshNvMap(true); }); break;
+    case 'mr-del': if (S.misSel?.size) confirmRecDelete([...S.misSel]); break;
+    case 'mr-del-ok': { const del = new Set(S.mrDel || []); S.collection = S.collection.filter((c) => !del.has(c.uid)); saveCollection(); S.misSel?.clear(); closeModal(); renderPhotoPins(); refreshMis(); toast(`${del.size} registro${del.size === 1 ? '' : 's'} eliminado${del.size === 1 ? '' : 's'}`); break; }
+    case 'mr-exp': if (S.misSel?.size) openModal(`<div class="top"><h2>Exportar ${S.misSel.size} registro${S.misSel.size === 1 ? '' : 's'}</h2><button class="x" data-act="modal-close" aria-label="Cerrar">${I.x}</button></div><div class="two"><button class="btn" data-mr-exp="csv">${I.dl}CSV (Excel)</button><button class="btn light" data-mr-exp="kml">${I.pin}KML (mapa)</button></div>`); break;
     case 'nv-edit-when': S.nuevo.editWhen = !S.nuevo.editWhen; renderNuevo(); break;
     case 'nv-add-photo': openPhotoSource('add'); break;
     case 'nv-replace-photo': openPhotoSource('replace'); break;
-    case 'nv-pick-loc': nuevoPickLoc(); break;
-    case 'lp-ok': closePicker(true); break;
-    case 'lp-cancel': closePicker(false); break;
-    case 'lp-me': pickerToMe(); break;
     case 'nv-save': nuevoSave(); break;
     case 'nv-reset': S.nuevo = null; renderNuevo(); break;
     case 'nv-discard': nuevoDiscard(true); break;
@@ -2216,12 +2506,14 @@ document.addEventListener('change', (e) => {
     else { settings.tabs[opt] = e.target.checked; saveSettings(); applyTabs(); }
     return;
   }
+  if (e.target.dataset?.mrCk) { const u = e.target.dataset.mrCk; e.target.checked ? S.misSel.add(u) : S.misSel.delete(u); renderMisRegistros(); return; }
+  if (e.target.dataset?.mrAll) { const rows = [...document.querySelectorAll('[data-mr-ck]')].map((x) => x.dataset.mrCk); rows.forEach((u) => (e.target.checked ? S.misSel.add(u) : S.misSel.delete(u))); renderMisRegistros(); return; }
   const f = e.target.files?.[0];
   if (!f) return;
   if (e.target.dataset.alImport) { importAliases(f); return; }
   if (e.target.dataset.photoInput === 'capture') onCapturePhoto(f);
-  if (e.target.dataset.photoInput === 'nuevo') { onNuevoPhoto(e.target.files, 'add'); closeModal(); }
-  if (e.target.dataset.photoInput === 'nuevo-replace') { onNuevoPhoto(e.target.files, 'replace'); closeModal(); }
+  if (e.target.dataset.photoInput === 'nuevo') { onNuevoPhoto(e.target.files, 'add', e.target.dataset.src); closeModal(); }
+  if (e.target.dataset.photoInput === 'nuevo-replace') { onNuevoPhoto(e.target.files, 'replace', e.target.dataset.src); closeModal(); }
 });
 // Con GPS real, el avatar te sigue mientras caminas (watchPosition) y el radar suena al acercarte.
 let watchId = null;
