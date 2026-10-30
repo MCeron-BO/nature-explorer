@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.8';
+const APP_VERSION = '1.0.9';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -1725,20 +1725,24 @@ function renderMisRegistros() {
   for (const u of [...sel]) if (!rows.some((o) => o.uid === u)) sel.delete(u);
   const nSel = sel.size;
   const pending = all.filter((o) => !o.taxonId).length;
-  const st = (o) => aiNow.has(o.uid) ? '<span class="mr-st ai"><i class="spin-s"></i>IA identificando…</span>'
-    : o.taxonId ? `<span class="mr-st ok">Identificada${o.idBy === 'ia' && o.conf != null ? ` · IA ${o.conf}%` : ''}</span>` : '<span class="mr-st no">Sin identificar</span>';
+  const fOpen = settings.misFOpen !== false;
+  const FL = { todas: 'Todas', ident: 'Identificadas', sin: 'Sin identificar' };
+  const SL = { reciente: 'Más recientes', antiguo: 'Más antiguos', nombre: 'Nombre (A-Z)' };
+  const st = (o) => aiNow.has(o.uid) ? '<span class="mr-st ai"><i class="spin-s"></i>IA…</span>'
+    : o.taxonId ? `<span class="mr-st ok" title="Identificada">${I.check}${o.idBy === 'ia' && o.conf != null ? `IA ${o.conf}%` : 'Identificada'}</span>` : '<span class="mr-st no">Sin identificar</span>';
   const row = (o) => `<div class="mr-row ${sel.has(o.uid) ? 'on' : ''}"><label class="mr-ck"><input type="checkbox" data-mr-ck="${esc(o.uid)}" ${sel.has(o.uid) ? 'checked' : ''} aria-label="Seleccionar ${esc(recName(o))}"></label>
     <span class="mr-ph" style="background-image:url('${esc(o.userPhoto || o.photo)}')"></span>
-    <div class="info"><b>${esc(recName(o))}</b>${o.taxonId && o.common ? `<i class="sci">${esc(o.sci)}</i>` : ''}<span>${I.cal}${esc(recDate(o))}</span><span>${I.pin}${esc(o.place || (o.lat != null ? `${o.lat.toFixed(4)}, ${o.lng.toFixed(4)}` : 'Sin ubicación'))}</span>${st(o)}</div>
+    <div class="info"><div class="l1"><b>${esc(recName(o))}</b>${o.taxonId || aiNow.has(o.uid) || recName(o) !== 'Sin identificar' ? st(o) : ''}</div>${o.taxonId && o.common ? `<i class="sci">${esc(o.sci)}</i>` : ''}<span class="l3">${I.cal}${esc(recDate(o))}<em>·</em>${I.pin}<span>${esc(o.place || (o.lat != null ? `${o.lat.toFixed(4)}, ${o.lng.toFixed(4)}` : 'Sin ubicación'))}</span></span></div>
     <button class="mr-more" data-mr-more="${esc(o.uid)}" aria-label="Opciones de ${esc(recName(o))}">⋮</button></div>`;
   const hint = !pending ? '' : !settings.token ? `<div class="mr-hint">${I.ai}<span>La IA identifica sola tus registros «Sin identificar». Para activarla agrega tu token de iNaturalist en <button data-act="open-settings">Ajustes</button>.</span></div>`
     : !navigator.onLine ? `<div class="mr-hint">${I.ai}<span>Sin conexión: la IA identificará tus registros al volver la señal.</span></div>` : '';
-  el.innerHTML = `<header class="head"><div class="title-row"><a href="#mapa" class="icon-btn" aria-label="Volver al mapa">${I.back}</a><div style="flex:1;min-width:0"><h1>Mis Registros</h1><span class="muted" style="font-size:13px">${nf(all.length)} registro${all.length === 1 ? '' : 's'}${pending ? ` · ${nf(pending)} sin identificar` : ''}</span></div></div>${nvTabs('mis')}
-    <div class="mr-filters">${[['todas', 'Todas'], ['ident', 'Identificadas'], ['sin', 'Sin identificar']].map(([id, l]) => `<button class="rad ${f === id ? 'on' : ''}" data-mrf="${id}" aria-pressed="${f === id}">${l}</button>`).join('')}</div>
-    <div class="mr-tools"><label class="mr-ck"><input type="checkbox" data-mr-all="1" ${rows.length && nSel === rows.length ? 'checked' : ''} aria-label="Seleccionar todos"></label><span>Ordenar por:</span><select id="mr-sort" aria-label="Ordenar registros"><option value="reciente" ${sort === 'reciente' ? 'selected' : ''}>Más recientes</option><option value="antiguo" ${sort === 'antiguo' ? 'selected' : ''}>Más antiguos</option><option value="nombre" ${sort === 'nombre' ? 'selected' : ''}>Nombre (A-Z)</option></select></div></header>
+  el.innerHTML = `<header class="head"><div class="title-row"><a href="#mapa" class="icon-btn" aria-label="Volver al mapa">${I.back}</a><div style="flex:1;min-width:0"><h1>Mis Registros</h1><span class="muted" style="font-size:12px">${nf(all.length)} registro${all.length === 1 ? '' : 's'}${pending ? ` · ${nf(pending)} sin identificar` : ''}</span></div></div>${nvTabs('mis')}
+    <button class="mr-ftoggle ${fOpen ? 'open' : ''}" data-act="mr-ftoggle" aria-expanded="${fOpen}">${I.filter}<span>${fOpen ? 'Ocultar filtros' : `<b>${FL[f]}</b> · ${SL[sort]}${nSel ? ` · ${nSel} seleccionado${nSel === 1 ? '' : 's'}` : ''}`}</span><small>${nf(rows.length)}</small>${fOpen ? I.up : I.down}</button>
+    ${fOpen ? `<div class="mr-filters">${Object.entries(FL).map(([id, l]) => `<button class="rad ${f === id ? 'on' : ''}" data-mrf="${id}" aria-pressed="${f === id}">${l}</button>`).join('')}</div>
+    <div class="mr-tools"><label class="mr-ck"><input type="checkbox" data-mr-all="1" ${rows.length && nSel === rows.length ? 'checked' : ''} aria-label="Seleccionar todos"></label><span>Ordenar por:</span><select id="mr-sort" aria-label="Ordenar registros">${Object.entries(SL).map(([id, l]) => `<option value="${id}" ${sort === id ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` : ''}</header>
     <div class="flow mr">${hint}${rows.length ? rows.map(row).join('') : `<div class="state">${all.length ? 'No hay registros con este filtro.' : 'Aún no tienes registros. Toca «Nuevo Registro» para empezar.'}</div>`}
     <div class="mr-bar"><button data-act="mr-del" ${nSel ? '' : 'disabled'}>${I.trash}<span>Eliminar<small>(${nSel} seleccionado${nSel === 1 ? '' : 's'})</small></span></button><i></i><button data-act="mr-exp" ${nSel ? '' : 'disabled'}>${I.dl}<span>Exportar<small>(${nSel} seleccionado${nSel === 1 ? '' : 's'})</small></span></button></div></div>`;
-  $('#mr-sort').addEventListener('change', (e) => { S.misSort = e.target.value; renderMisRegistros(); });
+  $('#mr-sort')?.addEventListener('change', (e) => { S.misSort = e.target.value; renderMisRegistros(); });
   autoIdentify();
   fillPlaces();
 }
@@ -2780,6 +2784,7 @@ document.addEventListener('click', async (e) => {
     case 'nv-mode-cat': S.nuevo.mode = 'cat'; if (S.nuevo.sel && !S.nuevo.result) nuevoClassify(); else renderNuevo(); break;
     case 'nv-map-big': { const n = S.nuevo; n.mapBig = !n.mapBig; t.textContent = n.mapBig ? 'Reducir' : 'Cambiar'; nvMapEl?.classList.toggle('big', n.mapBig); setTimeout(() => { nvMap?.invalidateSize(); refreshNvMap(true); }, 220); break; }
     case 'nv-loc-me': currentLoc().then((ll) => { setNvPhotoLoc(ll.lat, ll.lng, 'gps'); refreshNvMap(true); }); break;
+    case 'mr-ftoggle': settings.misFOpen = settings.misFOpen === false; saveSettings(); renderMisRegistros(); break;
     case 'mr-del': if (S.misSel?.size) confirmRecDelete([...S.misSel]); break;
     case 'mr-del-ok': { const del = new Set(S.mrDel || []); S.collection = S.collection.filter((c) => !del.has(c.uid)); saveCollection(); S.misSel?.clear(); closeModal(); renderPhotoPins(); refreshMis(); toast(`${del.size} registro${del.size === 1 ? '' : 's'} eliminado${del.size === 1 ? '' : 's'}`); break; }
     case 'mr-exp': if (S.misSel?.size) openModal(`<div class="top"><h2>Exportar ${S.misSel.size} registro${S.misSel.size === 1 ? '' : 's'}</h2><button class="x" data-act="modal-close" aria-label="Cerrar">${I.x}</button></div><div class="two"><button class="btn" data-mr-exp="csv">${I.dl}CSV (Excel)</button><button class="btn light" data-mr-exp="kml">${I.pin}KML (mapa)</button></div>`); break;
