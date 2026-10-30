@@ -712,3 +712,25 @@ body.is-offline .map-title span:not(.logo-leaf){color:#B23A2E;font-weight:800}
 .g-tip svg{width:16px;height:16px;flex-shrink:0;margin-top:1px}
 .g-btns{display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin-top:2px}
 .g-btns .btn{height:46px;font-size:15px}
+
+/* Avatar con foto de la cara */
+.avi{width:100%;height:100%;border-radius:999px;object-fit:cover;display:block}
+.hud .av,.profile .big-av,.avatar-pin span{overflow:hidden}
+.avatar-pin span:has(.avi){background:var(--g100)}
+.avatar-pin em{position:absolute;right:-3px;bottom:-1px;z-index:3;min-width:19px;height:19px;padding:0 4px;border-radius:999px;background:var(--g900);color:#fff;border:2px solid #fff;font:800 10px/15px var(--display);font-style:normal;text-align:center;box-sizing:border-box}
+.btn-av{width:24px;height:24px;display:inline-grid;place-items:center;border-radius:999px;overflow:hidden;font-size:18px;flex-shrink:0}
+.avatars .avb-photo{padding:2px;overflow:hidden}
+.avatars .avb-photo .avi{border-radius:10px}
+.avb-add{height:52px;border-radius:14px;border:2px dashed var(--line2,#C9D6CE);display:grid;place-items:center;color:var(--g900);cursor:pointer;background:#fff}
+.avb-add svg{width:24px;height:24px}
+.av-photo-row{display:flex;gap:6px;margin-top:8px}
+.av-photo-row .btn{flex:1;width:auto;min-width:0;height:42px;padding:0 8px;font-size:13px;gap:6px;white-space:nowrap}
+.av-photo-row .btn svg{width:18px;height:18px;flex-shrink:0}
+.av-photo-row .danger{flex:0 0 auto;color:#B3261E}
+.avc{position:relative;width:240px;height:240px;margin:0 auto;border-radius:16px;overflow:hidden;background:#17241D;touch-action:none;cursor:grab;user-select:none}
+.avc.drag{cursor:grabbing}
+.avc img{position:absolute;max-width:none;pointer-events:none}
+.avc i{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at center,transparent 119px,rgba(0,0,0,.55) 120px)}
+.avc i::after{content:'';position:absolute;inset:0;border-radius:999px;border:2px solid #fff}
+.avc-zoom{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:700;color:var(--ink2)}
+.avc-zoom input{flex:1;accent-color:var(--g900)}
