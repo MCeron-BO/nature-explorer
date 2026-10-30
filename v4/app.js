@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.6';
+const APP_VERSION = '1.0.7';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -1403,7 +1403,7 @@ function renderNuevo() {
   const ready = n.lat != null && (later || (r && !n.classifying));
   const why = n.lat == null ? 'Marca en el mapa dónde tomaste la foto.' : !later && !n.sel ? 'Elige la especie o toca «Identificar después».' : '';
   el.innerHTML = `${head}<div class="flow nv">
-    <div class="nv-hero" style="background-image:url('${main.preview}')"><button class="nv-edit nv-edit-del" data-nv-del="${n.main}" aria-label="Eliminar esta foto">${I.trash}</button><button class="nv-edit" data-act="nv-replace-photo" aria-label="Cambiar foto principal">${I.edit}</button></div>
+    <div class="nv-hero" style="background-image:url('${main.preview}')"><button class="nv-gal" data-act="nv-gallery" aria-label="Guardar esta foto en la galería del teléfono">${I.dl}<span>${main.savedGal ? 'Guardada' : 'Guardar en galería'}</span></button><button class="nv-edit nv-edit-del" data-nv-del="${n.main}" aria-label="Eliminar esta foto">${I.trash}</button><button class="nv-edit" data-act="nv-replace-photo" aria-label="Cambiar foto principal">${I.edit}</button></div>
     <div class="nv-strip">${n.photos.map((p, i) => `<div class="nv-th"><button class="${i === n.main ? 'on' : ''}" data-nv-main="${i}" aria-label="Foto ${i + 1}" style="background-image:url('${p.preview}')"></button><button class="nv-del" data-nv-del="${i}" aria-label="Eliminar la foto ${i + 1}">${I.x}</button></div>`).join('')}${n.photos.length < 9 ? '<button class="nv-add" data-act="nv-add-photo"><b>+</b><span>Agregar fotos</span></button>' : ''}</div>
     <div class="nv-row ${n.lat == null ? 'need' : ''}">${I.pin}<span class="info"><b id="nv-loc-t">${esc(locT)}</b><span id="nv-loc-s">${esc(locS)}</span></span><button class="chip-btn" data-act="nv-map-big" id="nv-map-big">${n.mapBig ? 'Reducir' : 'Cambiar'}</button></div>
     <div id="nv-map-slot"></div>
@@ -1640,6 +1640,7 @@ async function onNuevoPhoto(files, how, src) {
   else { n.photos.push(...items); n.main = n.photos.length - items.length; }
   if (noGps) toast(items.length === 1 ? 'La foto no trae ubicación: se usó tu ubicación actual. Ajústala en el mapa si hace falta.' : `${noGps} foto${noGps === 1 ? '' : 's'} sin ubicación: se usó tu ubicación actual.`);
   else if (fromPhoto) toast(fromPhoto === 1 ? 'Ubicación tomada de la foto' : 'Ubicaciones tomadas de las fotos');
+  else if (src === 'cam') toast('Foto agregada. Toca «Guardar en galería» si la quieres en tu teléfono.');
   nuevoLocChanged(true);
 }
 async function nuevoClassify() {
@@ -1670,6 +1671,38 @@ function nuevoSave() {
   setTimeout(() => addXP((later ? 0 : STATUS_XP[n.result.status] || 0) + 20, 'nuevo registro'), 500);
   checkBadges(null);
   if (later) setTimeout(autoIdentify, 800);
+}
+
+// Guarda una foto en el teléfono: en iPhone abre «Compartir» (opción «Guardar imagen» → Fotos);
+// en Android y computador se descarga (queda en Descargas, que la galería muestra).
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+async function saveToGallery(src, name) {
+  const blob = src instanceof Blob ? src : await (await fetch(src)).blob();
+  const file = new File([blob], name, { type: blob.type || 'image/jpeg' });
+  if (isIOS() && navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: name }); return true; } catch (e) { if (e.name === 'AbortError') return false; }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(file);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  return true;
+}
+const photoName = (label, when, i) => `nature-explorer-${fold(label || 'registro').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${String(when || today()).slice(0, 10)}${i ? `-${i}` : ''}.jpg`;
+async function nuevoGallery() {
+  const n = S.nuevo, p = n?.photos[n.main];
+  if (!p) return;
+  const label = n.mode !== 'later' && n.sel ? n.sel.taxon.name : 'registro';
+  // Se guarda la foto original (resolución completa); si no está, la versión reducida.
+  const ok = await saveToGallery(p.file || p.preview, photoName(label, n.when, n.photos.length > 1 ? n.main + 1 : 0)).catch(() => false);
+  if (!ok) return;
+  p.savedGal = true;
+  const b = $('.nv-gal span');
+  if (b) b.textContent = 'Guardada';
+  toast(isIOS() ? 'Elige «Guardar imagen» para dejarla en Fotos' : 'Foto guardada en Descargas: la verás en la galería');
 }
 
 /* ---------- mis registros ---------- */
@@ -1764,6 +1797,7 @@ function openRecMenu(uid) {
       <button data-mr-act="cat:${esc(uid)}">${I.book}<span>${o.taxonId ? 'Cambiar especie (catálogo)' : 'Buscar especie en el catálogo'}</span>${I.right}</button>
       ${settings.token ? `<button data-mr-act="ia:${esc(uid)}">${I.ai}<span>${o.taxonId ? 'Volver a identificar con IA' : 'Identificar con IA ahora'}</span>${I.right}</button>` : ''}
       ${o.lat != null ? `<button data-mr-act="map:${esc(uid)}">${I.pin}<span>Ver en el mapa</span>${I.right}</button>` : ''}
+      ${o.userPhoto ? `<button data-mr-act="gal:${esc(uid)}">${I.dl}<span>Guardar la foto en la galería</span>${I.right}</button>` : ''}
       <button data-mr-act="del:${esc(uid)}" style="color:#B3261E">${I.trash}<span>Eliminar registro</span></button>
     </div>`);
 }
@@ -2532,6 +2566,7 @@ document.addEventListener('click', async (e) => {
     if (a === 'cat') openRecCatalog(uid);
     if (a === 'ia') { closeModal(); aiTried.delete(uid); autoIdentify(o); }
     if (a === 'del') confirmRecDelete([uid]);
+    if (a === 'gal') { closeModal(); if (await saveToGallery(o.userPhoto, photoName(o.taxonId ? o.sci : 'registro', o.when || o.date)).catch(() => false)) toast(isIOS() ? 'Elige «Guardar imagen» para dejarla en Fotos' : 'Foto guardada en Descargas'); }
     if (a === 'map') { closeModal(); location.hash = '#mapa'; setTimeout(() => { map.flyTo([o.lat, o.lng], 17, { duration: 0.8 }); setTimeout(() => photoPins.get(uid)?.openPopup(), 900); }, 250); }
     return;
   }
@@ -2625,6 +2660,7 @@ document.addEventListener('click', async (e) => {
     case 'modal-close': closeModal(); break;
     case 'ficha-pdf': fichaPdf(); break;
     case 'cap-confirm': confirmCapture(); break;
+    case 'nv-gallery': nuevoGallery(); break;
     case 'nv-mode-later': S.nuevo.mode = 'later'; renderNuevo(); break;
     case 'nv-mode-cat': S.nuevo.mode = 'cat'; if (S.nuevo.sel && !S.nuevo.result) nuevoClassify(); else renderNuevo(); break;
     case 'nv-map-big': { const n = S.nuevo; n.mapBig = !n.mapBig; t.textContent = n.mapBig ? 'Reducir' : 'Cambiar'; nvMapEl?.classList.toggle('big', n.mapBig); setTimeout(() => { nvMap?.invalidateSize(); refreshNvMap(true); }, 220); break; }
