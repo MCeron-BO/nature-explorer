@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.4';
+const APP_VERSION = '1.0.5';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -138,7 +138,7 @@ const settings = Object.assign({ demo: true, lat: DEMO.lat, lng: DEMO.lng, label
 const RECENT_MIN = 3, RECENT_MAX = 6;
 const recentN = () => Math.min(RECENT_MAX, Math.max(RECENT_MIN, Math.round(Number(settings.recentN)) || RECENT_MIN));
 // Qué opciones muestra la barra inferior; «Más» siempre queda, porque desde ahí se vuelven a activar.
-settings.tabs = Object.assign({ mapa: true, especies: true, nuevo: true, coleccion: true }, settings.tabs);
+settings.tabs = Object.assign({ mapa: true, especies: true, nuevo: true, herbario: true, coleccion: true }, settings.tabs);
 // El zorro ya no existe como avatar: quien lo tenía guardado pasa a la persona.
 if (settings.avatar === '🦊') settings.avatar = '🧑';
 const S = {
@@ -1875,6 +1875,105 @@ function renderColeccion() {
       : '<div class="state">Aún no tienes observaciones. Captura una especie desde el mapa.</div>')}</div>`;
 }
 
+/* ---------- mi herbario ---------- */
+// Álbum de lo que has capturado e identificado, agrupado por familia › género › especie (taxonomía de iNaturalist).
+// La familia y el género de cada especie se guardan en el teléfono (nx4.taxa) para que funcione sin conexión.
+const taxa = ls.get('nx4.taxa', {});
+let taxaBusy = false;
+async function loadTaxa(ids) {
+  const need = [...new Set(ids)].filter((id) => !taxa[id]);
+  if (!need.length || taxaBusy || !navigator.onLine) return false;
+  taxaBusy = true;
+  let got = false;
+  for (let i = 0; i < need.length; i += 30) {
+    try {
+      const res = await getJSON(`${INAT}/taxa/${need.slice(i, i + 30).join(',')}?locale=es`);
+      for (const t of res.results) {
+        const anc = t.ancestors || [];
+        const fam = anc.find((a) => a.rank === 'family'), gen = t.rank === 'genus' ? t : anc.find((a) => a.rank === 'genus');
+        taxa[t.id] = { f: fam?.name || '', fc: cap(fam?.preferred_common_name), g: gen?.name || t.name.split(' ')[0], gc: cap(gen?.preferred_common_name) };
+        got = true;
+      }
+    } catch { /* se reintenta con conexión */ }
+  }
+  taxaBusy = false;
+  if (got) ls.set('nx4.taxa', taxa);
+  return got;
+}
+// Especies descubiertas: una por taxón, con cuántas veces la registraste y cuándo.
+function herbSpecies() {
+  const by = new Map();
+  for (const o of S.collection) {
+    if (!o.taxonId) continue;
+    const t = taxa[o.taxonId];
+    const zone = S.species.find((x) => x.inatId === o.taxonId);
+    const when = o.when || o.date || '';
+    let e = by.get(o.taxonId);
+    if (!e) {
+      e = { id: o.taxonId, sci: o.sci, common: o.common, photo: o.photo || zone?.photo || '', user: o.userPhoto || '', obs: 0, last: '', first: when,
+        f: t?.f || zone?.family || '', fc: t?.fc || '', g: t?.g || String(o.sci || '').split(' ')[0] };
+      by.set(o.taxonId, e);
+    }
+    e.obs++;
+    if (when > e.last) { e.last = when; if (o.userPhoto) e.user = o.userPhoto; }
+    if (when && when < e.first) e.first = when;
+  }
+  return [...by.values()];
+}
+const herbCover = (list) => { const x = list.find((e) => e.photo) || list[0]; return x ? (x.photo ? x.photo.replace('square', 'medium') : x.user) : ''; };
+const herbDate = (v) => (v ? new Date(v.length > 10 ? v : `${v}T12:00`).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
+function herbGroups(list, key) {
+  const m = new Map();
+  for (const e of list) { const k = e[key] || 'Sin clasificar'; if (!m.has(k)) m.set(k, []); m.get(k).push(e); }
+  return [...m.entries()].map(([name, items]) => ({ name, items, n: items.length, last: items.reduce((a, e) => (e.last > a ? e.last : a), ''), first: items.reduce((a, e) => (!a || (e.first && e.first < a) ? e.first : a), ''), common: items[0].fc }));
+}
+const HERB_SORTS = [['completos', 'Más completados'], ['recientes', 'Recientes'], ['fecha', 'Por fecha']];
+function herbSort(list, mode, cnt) {
+  return list.sort(mode === 'recientes' ? (a, b) => b.last.localeCompare(a.last) : mode === 'fecha' ? (a, b) => (a.first || '').localeCompare(b.first || '')
+    : (a, b) => cnt(b) - cnt(a) || a.name.localeCompare(b.name));
+}
+const herbChips = (cur) => `<div class="hb-sort">${HERB_SORTS.map(([id, l]) => `<button class="${cur === id ? 'on' : ''}" data-hbsort="${id}" aria-pressed="${cur === id}">${l}</button>`).join('')}</div>`;
+function renderHerbario(arg) {
+  const el = $('#s-herbario');
+  const list = herbSpecies();
+  // Completa familia y género de lo nuevo y vuelve a dibujar cuando llegan.
+  loadTaxa(list.map((e) => e.id)).then((got) => { if (got && route().name === 'herbario') renderHerbario(route().arg); });
+  const sort = S.hbSort || 'completos';
+  const [famName, genName] = arg ? arg.split('~') : [];
+  const fams = herbGroups(list, 'f');
+  el.scrollTop = 0;
+  if (!famName) {
+    herbSort(fams, sort === 'completos' ? 'completos' : sort, (g) => g.n);
+    el.innerHTML = `<header class="hb-top"><div class="hb-title">${I.book}<h1>Mi Herbario</h1></div><p>Explora las familias que has descubierto y revisa tus especies registradas.</p>
+      ${list.length ? `<div class="hb-stats"><span><b>${nf(fams.length)}</b> familia${fams.length === 1 ? '' : 's'}</span><span><b>${nf(herbGroups(list, 'g').length)}</b> géneros</span><span><b>${nf(list.length)}</b> especie${list.length === 1 ? '' : 's'}</span></div>${herbChips(sort)}` : ''}</header>
+      <div class="hb-fams">${fams.map((g) => `<a class="hb-fam" href="#herbario/${encodeURIComponent(g.name)}"><div class="t"><b>${esc(g.name)}</b><span>${nf(g.n)} especie${g.n === 1 ? '' : 's'} descubierta${g.n === 1 ? '' : 's'}</span>${g.common ? `<i>${esc(g.common)}</i>` : ''}</div><div class="ph" style="background-image:url('${esc(herbCover(g.items))}')"></div><span class="chev">${I.right}</span></a>`).join('')}
+      <div class="hb-tip">${I.leaf}<span>${list.length ? 'Registra nuevas especies para desbloquear más álbumes.' : 'Tu herbario está vacío. Captura una planta en el mapa o identifica un nuevo registro para abrir tu primer álbum.'}</span></div></div>`;
+    return;
+  }
+  const famItems = list.filter((e) => (e.f || 'Sin clasificar') === famName);
+  if (!famItems.length) { el.innerHTML = `<div class="state">Este álbum ya no tiene especies. <a href="#herbario">Volver a Mi Herbario</a></div>`; return; }
+  if (!genName) {
+    const gens = herbSort(herbGroups(famItems, 'g'), sort, (g) => g.items.reduce((a, e) => a + e.obs, 0) + g.n * 100);
+    el.innerHTML = `<header class="hb-hero" style="background-image:url('${esc(herbCover(famItems))}')"><a class="fab round back" href="#herbario" aria-label="Volver a Mi Herbario">${I.back}</a><div><h1>${esc(famName)}</h1><span>${famItems[0].fc ? `${esc(famItems[0].fc)} · ` : ''}Géneros descubiertos en esta familia.</span></div></header>
+      <div class="hb-body"><div class="hb-card"><div class="hb-card-h"><span class="hb-pill">${I.flower}Géneros (${gens.length})</span><button class="hb-info" data-act="hb-info" aria-label="Qué es un género">i</button></div><p>Estos son los géneros que has registrado dentro de la familia ${esc(famName)}.</p></div>
+      ${herbChips(sort)}
+      <div class="hb-grid">${gens.map((g) => `<a class="hb-gen" href="#herbario/${encodeURIComponent(`${famName}~${g.name}`)}"><div class="ph" style="background-image:url('${esc(herbCover(g.items))}')"></div><div class="t"><span><b>${esc(g.name)}</b><small>${nf(g.n)} especie${g.n === 1 ? '' : 's'}</small></span>${I.right}</div></a>`).join('')}</div></div>`;
+    return;
+  }
+  let sp = famItems.filter((e) => (e.g || 'Sin clasificar') === genName);
+  if (!sp.length) { el.innerHTML = `<div class="state">Este álbum ya no tiene especies. <a href="#herbario/${encodeURIComponent(famName)}">Volver a ${esc(famName)}</a></div>`; return; }
+  const q = fold(S.hbQ || '');
+  const shown = sp.filter((e) => !q || fold(`${e.common} ${e.sci}`).includes(q) || aliasHit({ inatId: e.id, sci: e.sci }, S.hbQ));
+  shown.sort(sort === 'recientes' ? (a, b) => b.last.localeCompare(a.last) : sort === 'fecha' ? (a, b) => (a.first || '').localeCompare(b.first || '') : (a, b) => b.obs - a.obs || a.sci.localeCompare(b.sci));
+  el.innerHTML = `<header class="hb-hero" style="background-image:url('${esc(herbCover(sp))}')"><a class="fab round back" href="#herbario/${encodeURIComponent(famName)}" aria-label="Volver a ${esc(famName)}">${I.back}</a><div><h1>${esc(genName)}</h1><span>${nf(sp.length)} especie${sp.length === 1 ? '' : 's'} registrada${sp.length === 1 ? '' : 's'} en este género.</span></div></header>
+    <div class="hb-body"><div class="hb-card"><div class="hb-card-h"><span class="hb-sp-ic">${I.leaf}</span><div style="flex:1;min-width:0"><b>Especies (${sp.length})</b><p>Listado de especies del género ${esc(genName)} que has registrado.</p></div><button class="hb-info" data-act="hb-search" aria-label="Buscar en este género">${I.search}</button></div>
+      ${S.hbSearch ? `<div class="search">${I.search}<label for="hb-q" class="sr">Buscar especie en el género</label><input id="hb-q" type="search" placeholder="Nombre, científico o alias" value="${esc(S.hbQ || '')}" autocomplete="off"></div>` : ''}</div>
+    ${herbChips(sort)}
+    <div class="hb-list">${shown.map((e) => `<a class="hb-sp" href="#ficha/${e.id}"><span class="ph" style="background-image:url('${esc(e.user || e.photo)}')"></span><span class="nm"><b>${esc(e.common || e.sci)}</b>${e.common ? `<i>${esc(e.sci)}</i>` : ''}</span><span class="meta"><span>${I.book}${nf(e.obs)} obs.</span><span>${I.cal}${esc(herbDate(e.last))}</span></span>${I.right}</a>`).join('') || '<div class="state">Sin coincidencias.</div>'}</div></div>`;
+  const inp = $('#hb-q');
+  if (inp) { inp.addEventListener('input', () => { S.hbQ = inp.value; const pos = inp.selectionStart; renderHerbario(arg); const n = $('#hb-q'); n.focus(); n.setSelectionRange(pos, pos); }); }
+}
+
 /* ---------- ajustes ---------- */
 function openSettings() {
   openModal(`<div class="top"><h2>Ajustes</h2><button class="x" data-act="modal-close" aria-label="Cerrar">${I.x}</button></div>
@@ -2083,7 +2182,7 @@ window.addEventListener('offline', () => {
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 /* ---------- barra inferior configurable ---------- */
-const TAB_NAMES = { mapa: 'Mapa', especies: 'Especies', nuevo: 'Registrar', coleccion: 'Colección' };
+const TAB_NAMES = { mapa: 'Mapa', especies: 'Especies', nuevo: 'Registrar', herbario: 'Mi Herbario', coleccion: 'Colección' };
 function applyTabs() {
   let n = 0;
   document.querySelectorAll('#tabbar [data-tab]').forEach((el) => {
@@ -2348,6 +2447,7 @@ function show() {
   if (name === 'captura') renderCaptura();
   if (name === 'nuevo') renderNuevo();
   if (name === 'coleccion') renderColeccion();
+  if (name === 'herbario') { if (S.hbArg !== arg) { S.hbSearch = false; S.hbQ = ''; } S.hbArg = arg; renderHerbario(arg); }
 }
 
 /* ---------- eventos ---------- */
@@ -2418,6 +2518,7 @@ document.addEventListener('click', async (e) => {
   }
   if (d.alSug != null) { const inp = $('#al-in'); inp.value = d.alSug; inp.focus(); return; }
   if (d.alOpen) { closeModal(); location.hash = `#ficha/${d.alOpen}`; return; }
+  if (d.hbsort) { S.hbSort = d.hbsort; renderHerbario(route().arg); return; }
   if (d.coltab) { S.colTab = d.coltab; renderColeccion(); return; }
   if (d.del) { S.collection = S.collection.filter((c) => c.uid !== d.del); saveCollection(); renderPhotoPins(); renderColeccion(); return; }
   if (d.revalidate) {
@@ -2461,6 +2562,8 @@ document.addEventListener('click', async (e) => {
     case 'sort-dist': setSort('dist'); break;
     case 'mq-all': S.q = $('#mq').value; hideMapSearch(); location.hash = '#especies'; setTimeout(() => { const q = $('#q'); if (q) q.value = S.q; renderEspecies(); }, 60); break;
     case 'open-settings': openSettings(); break;
+    case 'hb-info': toast('Un género agrupa especies muy emparentadas. Se completa con tus capturas y registros identificados.'); break;
+    case 'hb-search': S.hbSearch = !S.hbSearch; if (!S.hbSearch) S.hbQ = ''; renderHerbario(route().arg); $('#hb-q')?.focus(); break;
     case 'aliases': openAliasList(); break;
     case 'al-add': if (S.ficha) openAliasModal(S.ficha.sp); break;
     case 'al-save': saveAliasModal(); break;

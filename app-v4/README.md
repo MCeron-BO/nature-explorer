@@ -21,7 +21,7 @@ Abre http://localhost:5176
 
 ## Cambios de navegación
 
-- Barra inferior de 4 pestañas como el prototipo: **Mapa · Especies · Mis Observaciones · Más**.
+- Barra inferior: **Mapa · Especies · Registrar · Mi Herbario · Colección · Más** (se personaliza en Más › Personalizar la barra inferior).
 - **Más** abre: perfil, avatar y logros; ajustes; créditos del mapa; volver a elegir reino.
 - El nivel y el XP se ven en la pantalla de inicio, en Mis Observaciones y en Más.
 - El botón de capas alterna entre mapa **satelital** y **topográfico**.
@@ -32,6 +32,16 @@ Abre http://localhost:5176
 - El buscador del mapa, el de Especies y «Buscar en catálogo» de Nuevo registro revisan tus alias **primero**, sin importar mayúsculas, tildes ni espacios («bambu as», «BambúAS»). Los resultados con alias llevan la etiqueta ★. Además reconocen las iniciales del nombre común aunque no tengas alias («adp» → Aguja del pastor).
 - **Más › Mis alias** lista todos para editarlos (toca el alias), eliminarlos (X), abrir la ficha, y **Exportar / Importar** un archivo `.json` para respaldarlos o pasarlos a otro teléfono.
 - Se guardan solo en este teléfono (`nx4.aliases`), por especie (id de iNaturalist o nombre científico), y funcionan sin conexión.
+
+## Mi Herbario
+
+Álbum de lo que has capturado e identificado (capturas y nuevos registros con especie), que se llena solo a medida que descubres plantas:
+
+1. **Familias:** tarjetas con el nombre de la familia, «N especies descubiertas», su nombre común y la foto de una de sus especies.
+2. **Géneros** de la familia: tarjetas con foto y cuántas especies llevas en cada uno.
+3. **Especies** del género: foto tuya (o de iNaturalist), nombre, cuántas veces la registraste y la fecha del último registro; abre la ficha. Tiene buscador (también por alias).
+
+En los tres niveles se ordena por **Más completados**, **Recientes** o **Por fecha** (primer descubrimiento). La familia y el género salen de la taxonomía de iNaturalist y se guardan en el teléfono (`nx4.taxa`), así que el herbario funciona sin conexión.
 
 ## Tus fotos en el mapa
 
@@ -58,4 +68,4 @@ Técnicamente: `sw.js` es un *service worker* (app y librerías guardadas; APIs 
 
 ## Datos guardados
 
-En `localStorage` con claves propias (`nx4.settings`, `nx4.collection`, `nx4.game`, `nx4.aliases`), separadas de las otras versiones.
+En `localStorage` con claves propias (`nx4.settings`, `nx4.collection`, `nx4.game`, `nx4.aliases`, `nx4.taxa`), separadas de las otras versiones.
