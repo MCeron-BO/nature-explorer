@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.7';
+const APP_VERSION = '1.0.8';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -372,6 +372,7 @@ function openMore() {
     <button class="hud" data-act="profile" style="flex:none" aria-label="Ver tu perfil y logros"><span class="av">${settings.avatar}</span><span class="meta"><b>Nivel ${L.lv} · ${L.title}</b><span class="xpbar"><i style="width:${L.pct}%"></i></span></span><small>${nf(game.xp)} XP</small></button>
     <div class="menu">
       <button data-act="profile">${I.star}<span>Perfil, avatar y logros</span>${I.right}</button>
+      <button data-act="guide-start">${I.book}<span>Guía de uso (recorrido interactivo)</span>${I.right}</button>
       <button data-act="aliases">${I.star}<span>Mis alias de especies</span>${I.right}</button>
       <button data-act="open-settings">${I.filter}<span>Ajustes: ubicación, sonido e IA</span>${I.right}</button>
       <button data-act="credits">${I.book}<span>Créditos del mapa y los datos</span>${I.right}</button>
@@ -706,7 +707,7 @@ async function renderInicio() {
         <p>Elige un reino para comenzar</p>
       </header>
       <div class="kingdoms">
-        ${kingdom('ph-flora', '#mapa', I.leaf, 'Flora', 'Plantas, árboles, arbustos, cactus, helechos y más.', false)}
+        <div class="kwrap">${kingdom('ph-flora', '#mapa', I.leaf, 'Flora', 'Plantas, árboles, arbustos, cactus, helechos y más.', false)}<button class="k-guide" id="k-guide" data-act="guide-start">${I.book}<span><b>¿Primera vez? Recorre la app</b><small>Guía interactiva · 2 minutos</small></span><em>Nuevo</em>${I.right}</button></div>
         ${kingdom('ph-fauna', '', I.paw, 'Fauna', 'Mamíferos, aves, reptiles, anfibios, insectos y más.', true)}
         ${kingdom('ph-hongos', '', I.mush, 'Hongos', 'Setas, líquenes, mohos y más.', true)}
       </div>
@@ -724,6 +725,7 @@ async function renderInicio() {
       });
     } catch { /* las portadas son opcionales */ }
   }
+  $('#k-guide')?.classList.toggle('seen', !!settings.guideSeen);
   const L = levelInfo();
   const hp = $('#home-player');
   if (hp) hp.innerHTML = `<span class="av">${settings.avatar}</span><span class="meta"><b>Nivel ${L.lv} · ${L.title}</b><span class="xpbar"><i style="width:${L.pct}%"></i></span></span><small>${nf(game.xp)} XP · ${game.badges.length} logros</small>`;
@@ -2051,6 +2053,114 @@ function bindHerbRange(arg) {
   $('#hb-to')?.addEventListener('change', set('hbTo'));
 }
 
+/* ---------- guía de uso ---------- */
+// Recorrido interactivo sobre la app real: cada paso abre su pantalla, ilumina un elemento y explica para qué sirve.
+// Lo iluminado se puede tocar («Pruébalo»); el resto queda tapado para no perderse.
+const GUIDE = [
+  { r: 'inicio', icon: 'leaf', t: 'Bienvenida a Nature Explorer', b: 'Descubre las plantas que te rodean con datos reales de GBIF e iNaturalist: encuéntralas en el mapa, captúralas, registra nuevas especies y arma tu propio herbario.', tip: 'Avanza con «Siguiente». Puedes salir cuando quieras con la X.' },
+  { r: 'inicio', sel: '.kwrap', icon: 'leaf', t: 'Elige un reino', b: 'Flora es el reino disponible. Al tocar la tarjeta entras al mapa de plantas alrededor de tu ubicación. Fauna y Hongos llegarán pronto.' },
+  { r: 'mapa', sel: '.km-step', icon: 'target', t: 'Radio de búsqueda', b: 'Define cuántos kilómetros a tu alrededor se buscan plantas (de 1 a 50). El círculo verde del mapa muestra esa zona.', tip: 'Pruébalo: toca + o − y mira cómo cambia el círculo.' },
+  { r: 'mapa', sel: '.map-search', icon: 'search', t: 'Buscar una especie', b: 'Escribe el nombre común, el científico o un alias tuyo. Al elegir un resultado el mapa te lleva a su registro más cercano.', tip: 'Pruébalo: escribe las primeras letras de una planta.' },
+  { r: 'mapa', sel: '.leaflet-marker-icon .pin', icon: 'flower', t: 'Plantas en el mapa', b: 'Cada pin con foto es una especie registrada cerca. El color del borde indica su rareza. Al tocarla verás su ficha y una línea roja desde tu avatar hasta ella.' },
+  { r: 'mapa', sel: '.avatar-pin', icon: 'pin', t: 'Tu avatar', b: 'Muestra dónde estás. Con GPS real te sigue al caminar y el radar suena al acercarte a una planta. Mantén presionado un punto del mapa para llevar el avatar ahí.' },
+  { r: 'mapa', sel: '.map-side', icon: 'filter', t: 'Herramientas del mapa', b: 'De arriba abajo: tu ubicación GPS, capa satelital o topográfica, guardar la zona para usarla sin conexión, centrar el avatar y DEMO, que simula plantas cerca para practicar.' },
+  { r: 'mapa', sel: '#map-fabs', icon: 'cam', t: 'Capturar o registrar', b: 'Capturar: acércate a una planta del mapa y fotografíala para validarla y ganar XP. Nuevo Registro: para una planta que no aparece en el mapa.' },
+  { r: 'mapa', sel: '#sheet', icon: 'book', t: 'Resumen del entorno', b: 'Cuántas especies hay en tu radio y cuántas son nativas, endémicas o amenazadas. «Ir al detalle» abre el listado completo.' },
+  { r: 'especies', sel: '.head', icon: 'filter', t: 'Flora del entorno', b: 'El listado de especies de tu zona con buscador, filtros (nativas, endémicas, amenazadas), orden por nombre o cercanía y «Descargar lista» en Excel, CSV, PDF, KML o KMZ.' },
+  { r: 'nuevo', sel: '.flow .two', icon: 'cam', t: 'Nuevo registro', b: 'Toma una foto o elígela de la galería. La ubicación se pone sola (GPS o la que trae la foto) y la ajustas en el mapa. Luego identifícala en el catálogo o deja «Identificar después».', tip: 'También puedes guardar la foto en la galería de tu teléfono.' },
+  { r: 'nuevo', tab: 'mis', sel: '.nv-tabs', icon: 'ai', t: 'Mis Registros', b: 'Aquí quedan tus registros. Los «Sin identificar» los identifica la IA de iNaturalist (con tu token en Ajustes). Puedes filtrarlos, ordenarlos, exportarlos o eliminarlos.' },
+  { r: 'herbario', sel: '.hb-top', icon: 'book', t: 'Mi Herbario', b: 'Tu álbum se llena solo con lo que capturas e identificas: familias, luego géneros y luego especies. Ordénalo, filtra por rango de fechas y exporta.' },
+  { r: 'herbario', sel: '#tabbar', icon: 'right', t: 'Barra de navegación', b: 'Cambia entre Mapa, Especies, Registrar, Mi Herbario y Colección. En «Más» están tu perfil y logros, Ajustes, tus alias, el mapa sin conexión y esta guía.' },
+  { r: 'herbario', icon: 'check', t: '¡Listo para explorar!', b: 'Sal a buscar plantas, captúralas y completa tu herbario. Cada descubrimiento suma XP y desbloquea logros.', end: true }
+];
+let guide = null;
+function guideStart() {
+  closeModal();
+  guide = { i: 0 };
+  let el = $('#guide');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'guide'; el.className = 'guide';
+    el.innerHTML = '<i class="g-sh" data-g="t"></i><i class="g-sh" data-g="l"></i><i class="g-sh" data-g="r"></i><i class="g-sh" data-g="b"></i><i class="g-ring"></i><div class="g-card" role="dialog" aria-modal="false" aria-live="polite"></div>';
+    $('#phone').appendChild(el);
+  }
+  el.hidden = false;
+  clearInterval(guideStart.t);
+  guideStart.t = setInterval(guidePlace, 400);
+  guideGo(0);
+}
+function guideGo(i) {
+  if (!guide) return;
+  guide.i = Math.max(0, Math.min(GUIDE.length - 1, i));
+  const st = GUIDE[guide.i];
+  if (st.tab) S.nvTab = st.tab;
+  const moved = route().name !== st.r;
+  if (moved) location.hash = `#${st.r}`;
+  else if (st.r === 'nuevo') renderNuevo();
+  if (st.tab && !moved) renderNuevo();
+  if (moved && st.tab) setTimeout(() => { S.nvTab = st.tab; renderNuevo(); }, 60);
+  const c = $('#guide .g-card');
+  const n = GUIDE.length;
+  c.innerHTML = `<div class="g-top"><span class="g-ic">${I[st.icon] || I.leaf}</span><span class="g-step">Paso ${guide.i + 1} de ${n}</span><button class="g-x" data-act="guide-close" aria-label="Salir de la guía">${I.x}</button></div>
+    <div class="g-bar"><i style="width:${((guide.i + 1) / n) * 100}%"></i></div>
+    <b class="g-t">${st.t}</b><p>${st.b}</p>${st.tip ? `<span class="g-tip">${I.star}${st.tip}</span>` : ''}
+    <div class="g-btns">${guide.i ? '<button class="btn light" data-act="guide-prev">Anterior</button>' : '<button class="btn light" data-act="guide-close">Ahora no</button>'}${st.end ? '<button class="btn" data-act="guide-end">Empezar a explorar</button>' : '<button class="btn" data-act="guide-next">Siguiente</button>'}</div>`;
+  sfx('pop');
+  guide.wait = Date.now() + (moved ? 650 : 120);
+  guidePlace();
+  setTimeout(guidePlace, moved ? 700 : 150);
+}
+// Ubica el foco sobre el elemento del paso y la tarjeta arriba o abajo de él.
+function guidePlace() {
+  const el = $('#guide');
+  if (!guide || !el || el.hidden) return;
+  const st = GUIDE[guide.i];
+  const ph = $('#phone').getBoundingClientRect();
+  const scope = st.sel?.startsWith('#') ? document : $('.screen.active') || document;
+  const tg = st.sel && Date.now() >= guide.wait ? [...scope.querySelectorAll(st.sel)].find((x) => { const r = x.getBoundingClientRect(); return r.width > 4 && r.height > 4 && r.bottom > ph.top && r.top < ph.bottom; }) : null;
+  const W = ph.width, H = ph.height, pad = 6;
+  let x = 0, y = 0, w = 0, h = 0;
+  if (tg) {
+    const r = tg.getBoundingClientRect();
+    x = Math.max(4, r.left - ph.left - pad); y = Math.max(4, r.top - ph.top - pad);
+    w = Math.min(W - 4, r.right - ph.left + pad) - x; h = Math.min(H - 4, r.bottom - ph.top + pad) - y;
+  }
+  const set = (k, css) => Object.assign(el.querySelector(`[data-g="${k}"]`).style, css);
+  if (!tg) { set('t', { left: 0, top: 0, width: `${W}px`, height: `${H}px` }); ['l', 'r', 'b'].forEach((k) => set(k, { width: 0, height: 0 })); }
+  else {
+    set('t', { left: 0, top: 0, width: `${W}px`, height: `${y}px` });
+    set('b', { left: 0, top: `${y + h}px`, width: `${W}px`, height: `${Math.max(0, H - y - h)}px` });
+    set('l', { left: 0, top: `${y}px`, width: `${x}px`, height: `${h}px` });
+    set('r', { left: `${x + w}px`, top: `${y}px`, width: `${Math.max(0, W - x - w)}px`, height: `${h}px` });
+  }
+  Object.assign(el.querySelector('.g-ring').style, tg ? { display: 'block', left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px` } : { display: 'none' });
+  const c = el.querySelector('.g-card');
+  const ch = c.offsetHeight;
+  let top;
+  if (!tg) top = (H - ch) / 2;
+  else if (y + h / 2 < H / 2) top = Math.min(y + h + 12, H - ch - 10);
+  else top = Math.max(10, y - ch - 12);
+  // Si el elemento es muy alto y no cabe la tarjeta, va al pie sobre él.
+  if (tg && top + ch > H - 4) top = H - ch - 10;
+  c.style.top = `${Math.max(10, top)}px`;
+}
+function guideClose(done) {
+  clearInterval(guideStart.t);
+  const el = $('#guide');
+  if (el) el.hidden = true;
+  guide = null;
+  if (done || !settings.guideSeen) { settings.guideSeen = true; saveSettings(); }
+  $('#k-guide')?.classList.add('seen');
+  if (done) { location.hash = '#mapa'; toast('¡A explorar! Vuelve a la guía cuando quieras desde Más.'); }
+}
+document.addEventListener('keydown', (e) => {
+  if (!guide) return;
+  if (e.key === 'Escape') guideClose(false);
+  if (e.key === 'ArrowRight') guideGo(guide.i + 1);
+  if (e.key === 'ArrowLeft') guideGo(guide.i - 1);
+});
+window.addEventListener('resize', () => guidePlace());
+
 /* ---------- ajustes ---------- */
 function openSettings() {
   openModal(`<div class="top"><h2>Ajustes</h2><button class="x" data-act="modal-close" aria-label="Cerrar">${I.x}</button></div>
@@ -2642,6 +2752,11 @@ document.addEventListener('click', async (e) => {
     case 'mq-all': S.q = $('#mq').value; hideMapSearch(); location.hash = '#especies'; setTimeout(() => { const q = $('#q'); if (q) q.value = S.q; renderEspecies(); }, 60); break;
     case 'open-settings': openSettings(); break;
     case 'hb-export': openHerbExport(); break;
+    case 'guide-start': guideStart(); break;
+    case 'guide-next': guideGo(guide.i + 1); break;
+    case 'guide-prev': guideGo(guide.i - 1); break;
+    case 'guide-close': guideClose(false); break;
+    case 'guide-end': guideClose(true); break;
     case 'hb-range-clear': S.hbFrom = ''; S.hbTo = ''; renderHerbario(route().arg); break;
     case 'hb-info': toast('Un género agrupa especies muy emparentadas. Se completa con tus capturas y registros identificados.'); break;
     case 'hb-search': S.hbSearch = !S.hbSearch; if (!S.hbSearch) S.hbQ = ''; renderHerbario(route().arg); $('#hb-q')?.focus(); break;
