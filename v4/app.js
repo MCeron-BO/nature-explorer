@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.9';
+const APP_VERSION = '1.0.10';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -1405,7 +1405,7 @@ function renderNuevo() {
   const ready = n.lat != null && (later || (r && !n.classifying));
   const why = n.lat == null ? 'Marca en el mapa dónde tomaste la foto.' : !later && !n.sel ? 'Elige la especie o toca «Identificar después».' : '';
   el.innerHTML = `${head}<div class="flow nv">
-    <div class="nv-hero" style="background-image:url('${main.preview}')"><button class="nv-gal" data-act="nv-gallery" aria-label="Guardar esta foto en la galería del teléfono">${I.dl}<span>${main.savedGal ? 'Guardada' : 'Guardar en galería'}</span></button><button class="nv-edit nv-edit-del" data-nv-del="${n.main}" aria-label="Eliminar esta foto">${I.trash}</button><button class="nv-edit" data-act="nv-replace-photo" aria-label="Cambiar foto principal">${I.edit}</button></div>
+    <div class="nv-hero" style="background-image:url('${main.preview}')"><button class="nv-gal ${main.savedGal ? 'done' : ''}" data-act="nv-gallery" title="${main.savedGal ? 'Foto guardada en la galería' : 'Guardar en galería'}" aria-label="${main.savedGal ? 'Foto guardada en la galería. Guardar de nuevo' : 'Guardar esta foto en la galería del teléfono'}">${main.savedGal ? I.check : I.dl}</button><button class="nv-edit nv-edit-del" data-nv-del="${n.main}" aria-label="Eliminar esta foto">${I.trash}</button><button class="nv-edit" data-act="nv-replace-photo" aria-label="Cambiar foto principal">${I.edit}</button></div>
     <div class="nv-strip">${n.photos.map((p, i) => `<div class="nv-th"><button class="${i === n.main ? 'on' : ''}" data-nv-main="${i}" aria-label="Foto ${i + 1}" style="background-image:url('${p.preview}')"></button><button class="nv-del" data-nv-del="${i}" aria-label="Eliminar la foto ${i + 1}">${I.x}</button></div>`).join('')}${n.photos.length < 9 ? '<button class="nv-add" data-act="nv-add-photo"><b>+</b><span>Agregar fotos</span></button>' : ''}</div>
     <div class="nv-row ${n.lat == null ? 'need' : ''}">${I.pin}<span class="info"><b id="nv-loc-t">${esc(locT)}</b><span id="nv-loc-s">${esc(locS)}</span></span><button class="chip-btn" data-act="nv-map-big" id="nv-map-big">${n.mapBig ? 'Reducir' : 'Cambiar'}</button></div>
     <div id="nv-map-slot"></div>
@@ -1702,8 +1702,8 @@ async function nuevoGallery() {
   const ok = await saveToGallery(p.file || p.preview, photoName(label, n.when, n.photos.length > 1 ? n.main + 1 : 0)).catch(() => false);
   if (!ok) return;
   p.savedGal = true;
-  const b = $('.nv-gal span');
-  if (b) b.textContent = 'Guardada';
+  const b = $('.nv-gal');
+  if (b) { b.classList.add('done'); b.innerHTML = I.check; b.title = 'Foto guardada en la galería'; b.setAttribute('aria-label', 'Foto guardada en la galería. Guardar de nuevo'); }
   toast(isIOS() ? 'Elige «Guardar imagen» para dejarla en Fotos' : 'Foto guardada en Descargas: la verás en la galería');
 }
 
