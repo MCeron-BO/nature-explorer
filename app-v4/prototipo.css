@@ -654,3 +654,14 @@ body.is-offline .map-title span:not(.logo-leaf){color:#B23A2E;font-weight:800}
 .hb-sp .meta span{display:flex;align-items:center;gap:4px}
 .hb-sp .meta svg{width:14px;height:14px}
 .hb-sp>svg{width:18px;height:18px;flex-shrink:0;color:var(--ink2)}
+.hb-range{display:flex;align-items:flex-end;gap:8px;background:#F4F8F5;border-radius:14px;padding:8px 10px}
+.hb-range label{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:700;color:var(--ink2)}
+.hb-range input{height:38px;border:1px solid var(--line2);border-radius:10px;padding:0 8px;font:inherit;font-size:14px;color:var(--ink);background:#fff;min-width:0;width:100%}
+.hb-range button{width:38px;height:38px;border-radius:999px;border:none;background:#fff;color:var(--ink2);display:grid;place-items:center;flex-shrink:0;box-shadow:0 0 0 1px var(--line2)}
+.hb-range button svg{width:16px;height:16px}
+.hb-tools{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2);font-weight:600}
+.hb-tools>span{flex:1;min-width:0}
+.hb-exp-sum{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.hb-exp-sum span{display:flex;justify-content:space-between;gap:12px;padding:9px 12px;font-size:14px;border-bottom:1px solid var(--line);text-align:right}
+.hb-exp-sum span:last-child{border-bottom:none}
+.hb-exp-sum b{color:var(--ink2);font-weight:700;text-align:left}
