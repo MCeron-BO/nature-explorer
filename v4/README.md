@@ -41,7 +41,7 @@ Abre http://localhost:5176
 2. **Géneros** de la familia: tarjetas con foto y cuántas especies llevas en cada uno.
 3. **Especies** del género: foto tuya (o de iNaturalist), nombre, cuántas veces la registraste y la fecha del último registro; abre la ficha. Tiene buscador (también por alias).
 
-En los tres niveles se ordena por **Más completados**, **Recientes** o **Por fecha** (primer descubrimiento). La familia y el género salen de la taxonomía de iNaturalist y se guardan en el teléfono (`nx4.taxa`), así que el herbario funciona sin conexión.
+En los tres niveles se ordena por **Más completados**, **Recientes** o **Por fecha** (primer descubrimiento). Con **Por fecha** aparecen **Desde / Hasta** para ver solo los registros de un rango de fechas (la X lo quita). **Exportar** descarga en CSV o KML los registros de lo que estás viendo (todo el herbario, una familia o un género), con el orden, el rango de fechas y la búsqueda aplicados; antes muestra un resumen de los filtros. El CSV incluye familia, género, tipo (captura o nuevo registro), quién la identificó, fecha, coordenadas, lugar y notas. La familia y el género salen de la taxonomía de iNaturalist y se guardan en el teléfono (`nx4.taxa`), así que el herbario funciona sin conexión.
 
 ## Tus fotos en el mapa
 
