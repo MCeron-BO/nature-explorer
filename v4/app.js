@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.10';
+const APP_VERSION = '1.0.11';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -171,6 +171,10 @@ let aliases = ls.get('nx4.aliases', []);
 const saveAliases = () => ls.set('nx4.aliases', aliases);
 
 /* ---------- juego: XP, niveles, rareza y logros ---------- */
+// Foto de la cara como avatar: se guarda aparte (no en los ajustes, que se escriben a cada paso) y solo en este teléfono.
+let avPhoto = ls.get('nx4.avatarPhoto', '');
+const avIsPhoto = () => settings.avatar === 'foto' && !!avPhoto;
+const avHtml = () => (avIsPhoto() ? `<img class="avi" src="${avPhoto}" alt="">` : settings.avatar === 'foto' ? '🧑' : settings.avatar);
 const AVATARS = ['🧑', '👩', '👨', '🐸', '🦉', '🐝', '🦎', '🐢', '🐼', '🐙', '🦋', '🐞'];
 const LEVELS = ['Semilla', 'Brote', 'Raíz', 'Tallo', 'Follaje', 'Floración', 'Fruto', 'Bosque maduro'];
 const game = Object.assign({ xp: 0, badges: [] }, ls.get('nx4.game', {}));
@@ -232,6 +236,7 @@ function addXP(amount, why) {
   clearTimeout(xpPopT); xpPopT = setTimeout(() => pop.classList.remove('on'), 1600);
   const after = levelInfo();
   if (after.lv > before) {
+    refreshAvatar();
     setTimeout(() => { sfx('levelup'); vibrate([60, 40, 60, 40, 120]); toast(`Subiste al nivel ${after.lv}: ${after.title}`); }, 700);
   } else if (why) {
     sfx('xp');
@@ -264,7 +269,7 @@ function renderHud() {
   const h = $('#hud');
   if (!h) return;
   const L = levelInfo();
-  h.innerHTML = `<span class="av">${settings.avatar}</span><span class="meta"><b>Nivel ${L.lv} · ${L.title}</b><span class="xpbar"><i style="width:${L.pct}%"></i></span></span><small>${nf(game.xp)} XP</small>`;
+  h.innerHTML = `<span class="av">${avHtml()}</span><span class="meta"><b>Nivel ${L.lv} · ${L.title}</b><span class="xpbar"><i style="width:${L.pct}%"></i></span></span><small>${nf(game.xp)} XP</small>`;
 }
 
 /* ---------- datos del entorno ---------- */
@@ -369,7 +374,7 @@ function toggleLayer() {
 function openMore() {
   const L = levelInfo();
   openModal(`<div class="top"><h2>Más</h2><button class="x" data-act="modal-close" aria-label="Cerrar">${I.x}</button></div>
-    <button class="hud" data-act="profile" style="flex:none" aria-label="Ver tu perfil y logros"><span class="av">${settings.avatar}</span><span class="meta"><b>Nivel ${L.lv} · ${L.title}</b><span class="xpbar"><i style="width:${L.pct}%"></i></span></span><small>${nf(game.xp)} XP</small></button>
+    <button class="hud" data-act="profile" style="flex:none" aria-label="Ver tu perfil y logros"><span class="av">${avHtml()}</span><span class="meta"><b>Nivel ${L.lv} · ${L.title}</b><span class="xpbar"><i style="width:${L.pct}%"></i></span></span><small>${nf(game.xp)} XP</small></button>
     <div class="menu">
       <button data-act="profile">${I.star}<span>Perfil, avatar y logros</span>${I.right}</button>
       <button data-act="guide-start">${I.book}<span>Guía de uso (recorrido interactivo)</span>${I.right}</button>
@@ -410,7 +415,7 @@ function initMap() {
   renderPhotoPins();
 }
 function avatarIcon() {
-  return L.divIcon({ className: '', html: `<div class="avatar-pin ${settings.demo ? 'drag' : ''}"><i></i><span>${settings.avatar}</span>${settings.demo ? '<b>Arrastra para moverte</b>' : ''}</div>`, iconSize: [52, 52], iconAnchor: [26, 26] });
+  return L.divIcon({ className: '', html: `<div class="avatar-pin ${settings.demo ? 'drag' : ''}"><i></i><span>${avHtml()}</span><em>${levelInfo().lv}</em>${settings.demo ? '<b>Arrastra para moverte</b>' : ''}</div>`, iconSize: [52, 52], iconAnchor: [26, 26] });
 }
 function refreshAvatar() {
   if (!userMarker) return;
@@ -728,15 +733,93 @@ async function renderInicio() {
   $('#k-guide')?.classList.toggle('seen', !!settings.guideSeen);
   const L = levelInfo();
   const hp = $('#home-player');
-  if (hp) hp.innerHTML = `<span class="av">${settings.avatar}</span><span class="meta"><b>Nivel ${L.lv} · ${L.title}</b><span class="xpbar"><i style="width:${L.pct}%"></i></span></span><small>${nf(game.xp)} XP · ${game.badges.length} logros</small>`;
+  if (hp) hp.innerHTML = `<span class="av">${avHtml()}</span><span class="meta"><b>Nivel ${L.lv} · ${L.title}</b><span class="xpbar"><i style="width:${L.pct}%"></i></span></span><small>${nf(game.xp)} XP · ${game.badges.length} logros</small>`;
 }
 function openProfile() {
   const L = levelInfo();
   openModal(`<div class="top"><h2>Tu perfil</h2><button class="x" data-act="modal-close" aria-label="Cerrar">${I.x}</button></div>
-    <div class="profile"><span class="big-av">${settings.avatar}</span><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px"><b style="font:700 18px var(--display)">Nivel ${L.lv} · ${L.title}</b><span class="xpbar"><i style="width:${L.pct}%"></i></span><span class="muted" style="font-size:12px;font-weight:700">${nf(game.xp)} XP${L.max ? ' · Nivel máximo' : ` · faltan ${nf(L.next - game.xp)} XP para el nivel ${L.lv + 1}`}</span></div></div>
-    <div class="field"><span style="font-weight:800">Elige tu avatar</span><div class="avatars">${AVATARS.map((a) => `<button class="${a === settings.avatar ? 'on' : ''}" data-avatar="${a}" aria-label="Avatar ${a}" aria-pressed="${a === settings.avatar}">${a}</button>`).join('')}</div></div>
+    <div class="profile"><span class="big-av">${avHtml()}</span><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px"><b style="font:700 18px var(--display)">Nivel ${L.lv} · ${L.title}</b><span class="xpbar"><i style="width:${L.pct}%"></i></span><span class="muted" style="font-size:12px;font-weight:700">${nf(game.xp)} XP${L.max ? ' · Nivel máximo' : ` · faltan ${nf(L.next - game.xp)} XP para el nivel ${L.lv + 1}`}</span></div></div>
+    <div class="field"><span style="font-weight:800">Elige tu avatar</span><div class="avatars">${avPhoto
+      ? `<button class="avb-photo ${avIsPhoto() ? 'on' : ''}" data-avatar="foto" aria-label="Tu foto" aria-pressed="${avIsPhoto()}"><img class="avi" src="${avPhoto}" alt=""></button>`
+      : `<label class="avb-add" aria-label="Agregar tu foto desde la galería">${I.cam}<input type="file" accept="image/*" class="sr" data-av-input="1"></label>`}${AVATARS.map((a) => `<button class="${a === settings.avatar ? 'on' : ''}" data-avatar="${a}" aria-label="Avatar ${a}" aria-pressed="${a === settings.avatar}">${a}</button>`).join('')}</div>
+      <div class="av-photo-row"><label class="btn light">${I.cam}Tomar selfie<input type="file" accept="image/*" capture="user" class="sr" data-av-input="1"></label><label class="btn light">${I.img}${avPhoto ? 'Otra foto' : 'Galería'}<input type="file" accept="image/*" class="sr" data-av-input="1"></label>${avPhoto ? `<button class="btn light danger" data-act="av-photo-del">${I.trash}Quitar</button>` : ''}</div>
+      <span class="muted" style="font-size:12px">Tu foto se guarda solo en este teléfono: no se envía a iNaturalist ni se incluye al exportar.</span></div>
     <div class="field"><span style="font-weight:800">Logros · ${game.badges.length} de ${BADGES.length}</span><div class="badges">${BADGES.map((b) => `<div class="badge ${game.badges.includes(b.id) ? '' : 'off'}"><i>${b.icon}</i><b>${b.name}</b><span>${b.desc}</span></div>`).join('')}</div></div>
     <div class="note"><b>¿Cómo gano XP?</b><br>Capturar +10 · Especie nueva para ti +25 · Bonus por rareza hasta +100 · Validar con foto +50 · Posible nuevo registro local +150 · Posible ampliación de distribución +300</div>`);
+}
+
+// Recorte circular de la foto del avatar: arrastrar para centrar, deslizador (o rueda) para acercar.
+const AVC = 240, AV_OUT = 256;
+let avCrop = null;
+function openAvatarCrop(file) {
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    avCrop = { img, url, z: 1, x: 0, y: 0 };
+    openModal(`<div class="top"><h2>Ajusta tu foto</h2><button class="x" data-act="av-crop-cancel" aria-label="Cancelar">${I.x}</button></div>
+      <div class="avc" id="avc"><img src="${url}" alt="Tu foto" draggable="false"><i></i></div>
+      <span class="muted" style="font-size:13px;text-align:center">Arrastra la foto para centrar tu cara en el círculo</span>
+      <label class="avc-zoom"><span>Alejar</span><input type="range" id="avc-z" min="1" max="4" step="0.01" value="1" aria-label="Acercar o alejar la foto"><span>Acercar</span></label>
+      <div class="two"><button class="btn light" data-act="av-crop-cancel">Cancelar</button><button class="btn" data-act="av-crop-ok">${I.check}Usar foto</button></div>`);
+    bindAvatarCrop();
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); toast('No se pudo abrir esa imagen. Prueba con otra (JPG o PNG).'); };
+  img.src = url;
+}
+// Tamaño y posición de la foto dentro del cuadro; siempre cubre todo el círculo.
+function avCropBox() {
+  const c = avCrop, w = c.img.naturalWidth, h = c.img.naturalHeight;
+  const sc = (AVC / Math.min(w, h)) * c.z, W = w * sc, H = h * sc;
+  const mx = (W - AVC) / 2, my = (H - AVC) / 2;
+  c.x = Math.max(-mx, Math.min(mx, c.x));
+  c.y = Math.max(-my, Math.min(my, c.y));
+  return { W, H, left: (AVC - W) / 2 + c.x, top: (AVC - H) / 2 + c.y };
+}
+function avCropDraw() {
+  const b = avCropBox(), im = $('#avc img');
+  if (im) Object.assign(im.style, { width: `${b.W}px`, height: `${b.H}px`, left: `${b.left}px`, top: `${b.top}px` });
+}
+function bindAvatarCrop() {
+  const box = $('#avc'), z = $('#avc-z');
+  let drag = null;
+  box.addEventListener('pointerdown', (e) => { drag = { px: e.clientX, py: e.clientY, x: avCrop.x, y: avCrop.y }; box.setPointerCapture(e.pointerId); box.classList.add('drag'); });
+  box.addEventListener('pointermove', (e) => { if (!drag) return; avCrop.x = drag.x + e.clientX - drag.px; avCrop.y = drag.y + e.clientY - drag.py; avCropDraw(); });
+  const end = () => { drag = null; box.classList.remove('drag'); };
+  box.addEventListener('pointerup', end);
+  box.addEventListener('pointercancel', end);
+  const setZ = (v) => { avCrop.z = Math.max(1, Math.min(4, v)); z.value = avCrop.z; avCropDraw(); };
+  z.addEventListener('input', () => setZ(+z.value));
+  box.addEventListener('wheel', (e) => { e.preventDefault(); setZ(avCrop.z * (e.deltaY < 0 ? 1.08 : 1 / 1.08)); }, { passive: false });
+  avCropDraw();
+}
+function avCropClose() {
+  if (avCrop) URL.revokeObjectURL(avCrop.url);
+  avCrop = null;
+}
+function avatarChanged() {
+  saveSettings(); refreshAvatar(); renderHud(); sfx('pop'); openProfile();
+  if (route().name === 'inicio') renderInicio();
+  document.querySelectorAll('.btn-av').forEach((b) => (b.innerHTML = avHtml()));
+}
+function saveAvatarCrop() {
+  if (!avCrop) return;
+  const b = avCropBox(), k = AV_OUT / AVC;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = AV_OUT;
+  cv.getContext('2d').drawImage(avCrop.img, b.left * k, b.top * k, b.W * k, b.H * k);
+  const data = cv.toDataURL('image/jpeg', 0.85);
+  try { localStorage.setItem('nx4.avatarPhoto', JSON.stringify(data)); } catch { toast('No hay espacio para guardar la foto en este teléfono'); return; }
+  avPhoto = data;
+  settings.avatar = 'foto';
+  avCropClose();
+  avatarChanged();
+  toast('Listo: tu foto es tu avatar');
+}
+function deleteAvatarPhoto() {
+  avPhoto = '';
+  try { localStorage.removeItem('nx4.avatarPhoto'); } catch { /* sin almacenamiento */ }
+  if (settings.avatar === 'foto') settings.avatar = '🧑';
+  avatarChanged();
 }
 
 /* ---------- especies ---------- */
@@ -1900,7 +1983,7 @@ function renderColeccion() {
   const L = levelInfo();
   el.innerHTML = `<header class="head" style="border:none">
     <div class="title-row"><a href="#mapa" class="icon-btn" aria-label="Volver al mapa">${I.back}</a><h1 style="flex:1">Mis Observaciones</h1></div>
-    <button class="hud" data-act="profile" style="flex:none" aria-label="Ver tu perfil y logros"><span class="av">${settings.avatar}</span><span class="meta"><b>Nivel ${L.lv} · ${L.title}</b><span class="xpbar"><i style="width:${L.pct}%"></i></span></span><small>${game.badges.length}/${BADGES.length} logros</small></button>
+    <button class="hud" data-act="profile" style="flex:none" aria-label="Ver tu perfil y logros"><span class="av">${avHtml()}</span><span class="meta"><b>Nivel ${L.lv} · ${L.title}</b><span class="xpbar"><i style="width:${L.pct}%"></i></span></span><small>${game.badges.length}/${BADGES.length} logros</small></button>
     <div class="sumrow"><div style="background:var(--g50)"><b style="color:var(--g900)">${col.filter((c) => c.kind === 'captura').length}</b>Capturadas</div><div style="background:var(--g50)"><b style="color:var(--g900)">${by('validada').length}</b>Validadas</div><div style="background:var(--amber50)"><b style="color:var(--amber)">${by('nuevo_local').length + by('ampliacion').length}</b>Nuevos reg.</div><div style="background:var(--orange50)"><b style="color:var(--orange)">${by('pendiente').length}</b>Pendientes</div></div>
     <div class="seg" role="tablist"><button role="tab" class="${S.colTab === 'coleccion' ? 'on' : ''}" aria-selected="${S.colTab === 'coleccion'}" data-coltab="coleccion">Colección</button><button role="tab" class="${S.colTab === 'obs' ? 'on' : ''}" aria-selected="${S.colTab === 'obs'}" data-coltab="obs">Observaciones</button></div></header>
     <div class="scrollarea">${S.colTab === 'coleccion' ? `
@@ -2172,7 +2255,7 @@ function openSettings() {
       <div class="two"><button class="fmt ${settings.demo ? 'on' : ''}" data-act="use-demo"><b>Prueba</b><span class="muted" style="font-size:12px">${esc(DEMO.label)}</span></button><button class="fmt ${!settings.demo ? 'on' : ''}" data-act="use-gps"><b>GPS real</b><span class="muted" style="font-size:12px">Ubicación del dispositivo</span></button></div>
       <span class="muted" style="font-size:12px">También puedes mover el mapa y tocar el botón de alfiler para explorar cualquier lugar.</span></div>
     <label class="mini" style="cursor:pointer"><input type="checkbox" id="snd" ${settings.sound !== false ? 'checked' : ''} style="width:22px;height:22px;accent-color:var(--g900)"><span class="info"><b style="font-size:15px">Sonidos y vibración</b><span class="muted" style="font-size:13px">Radar de cercanía, capturas, XP y logros</span></span></label>
-    <button class="btn light" data-act="profile">${settings.avatar} Cambiar avatar y ver logros</button>
+    <button class="btn light" data-act="profile"><span class="btn-av">${avHtml()}</span> Cambiar avatar y ver logros</button>
     <div class="field"><label for="rec-n">Especies recientes en Nuevo registro</label><select id="rec-n">${Array.from({ length: RECENT_MAX - RECENT_MIN + 1 }, (_, i) => RECENT_MIN + i).map((k) => `<option value="${k}" ${recentN() === k ? 'selected' : ''}>${k} especies</option>`).join('')}</select><span class="muted" style="font-size:12px">Accesos rápidos para elegir la especie sin buscarla (mínimo ${RECENT_MIN}, máximo ${RECENT_MAX}).</span></div>
     <div class="field"><label for="cap-m">Qué tan cerca debes estar para capturar</label><select id="cap-m">${[20, 50, 100, 250].map((m) => `<option value="${m}" ${settings.capture === m ? 'selected' : ''}>${m} m</option>`).join('')}</select></div>
     <div class="field"><label for="tok">Token de API de iNaturalist (opcional)</label><input id="tok" type="password" autocomplete="off" value="${esc(settings.token)}" placeholder="Activa la identificación visual con IA">
@@ -2646,7 +2729,7 @@ document.addEventListener('click', async (e) => {
   const t = e.target.closest('button,[data-capture]');
   if (!t) { if (e.target.id === 'modal') closeModal(); return; }
   const d = t.dataset;
-  if (d.avatar) { settings.avatar = d.avatar; saveSettings(); refreshAvatar(); renderHud(); sfx('pop'); openProfile(); if (route().name === 'inicio') renderInicio(); return; }
+  if (d.avatar) { settings.avatar = d.avatar; avatarChanged(); return; }
   if (d.mq) { goToSpecies(d.mq); return; }
   if (d.act === 'km-dec' || d.act === 'km-inc') { changeRadius(d.act === 'km-inc' ? 1 : -1); return; }
   // Un deslizamiento del panel también dispara un clic al soltar: se ignora para no cambiarlo dos veces.
@@ -2780,6 +2863,9 @@ document.addEventListener('click', async (e) => {
     case 'ficha-pdf': fichaPdf(); break;
     case 'cap-confirm': confirmCapture(); break;
     case 'nv-gallery': nuevoGallery(); break;
+    case 'av-crop-ok': saveAvatarCrop(); break;
+    case 'av-crop-cancel': avCropClose(); openProfile(); break;
+    case 'av-photo-del': deleteAvatarPhoto(); break;
     case 'nv-mode-later': S.nuevo.mode = 'later'; renderNuevo(); break;
     case 'nv-mode-cat': S.nuevo.mode = 'cat'; if (S.nuevo.sel && !S.nuevo.result) nuevoClassify(); else renderNuevo(); break;
     case 'nv-map-big': { const n = S.nuevo; n.mapBig = !n.mapBig; t.textContent = n.mapBig ? 'Reducir' : 'Cambiar'; nvMapEl?.classList.toggle('big', n.mapBig); setTimeout(() => { nvMap?.invalidateSize(); refreshNvMap(true); }, 220); break; }
@@ -2816,6 +2902,7 @@ document.addEventListener('change', (e) => {
   const f = e.target.files?.[0];
   if (!f) return;
   if (e.target.dataset.alImport) { importAliases(f); return; }
+  if (e.target.dataset.avInput) { openAvatarCrop(f); e.target.value = ''; return; }
   if (e.target.dataset.photoInput === 'capture') onCapturePhoto(f);
   if (e.target.dataset.photoInput === 'nuevo') { onNuevoPhoto(e.target.files, 'add', e.target.dataset.src); closeModal(); }
   if (e.target.dataset.photoInput === 'nuevo-replace') { onNuevoPhoto(e.target.files, 'replace', e.target.dataset.src); closeModal(); }

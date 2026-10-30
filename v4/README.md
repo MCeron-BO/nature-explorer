@@ -29,6 +29,7 @@ Abre http://localhost:5176
 
 - Barra inferior: **Mapa · Especies · Registrar · Mi Herbario · Colección · Más** (se personaliza en Más › Personalizar la barra inferior).
 - **Más** abre: perfil, avatar y logros; ajustes; créditos del mapa; volver a elegir reino.
+- **Avatar con tu foto:** en *Tu perfil › Elige tu avatar* puedes usar **Tomar selfie** (cámara frontal) o **Galería**. Se abre un recorte circular: arrastras la foto para centrar tu cara y el deslizador (o la rueda del mouse) acerca o aleja. «Usar foto» la guarda reducida a 256 × 256 px (unos 10–30 KB) solo en este teléfono (`nx4.avatarPhoto`): no se envía a iNaturalist ni se incluye al exportar. Tu cara aparece en el pin del mapa (con una insignia con tu nivel), la barra de nivel, el perfil, Inicio, Colección y el mapa de Nuevo Registro. La casilla «Tu foto» queda junto a los emojis para volver a ella; **Quitar** la borra y vuelve al emoji.
 - El nivel y el XP se ven en la pantalla de inicio, en Mis Observaciones y en Más.
 - El botón de capas alterna entre mapa **satelital** y **topográfico**.
 
