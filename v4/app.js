@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.11';
+const APP_VERSION = '1.0.12';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -165,7 +165,119 @@ const S = {
   band: null
 };
 const saveSettings = () => ls.set('nx4.settings', Object.assign(settings, { lat: S.pos.lat, lng: S.pos.lng, label: S.posLabel, radius: S.radius }));
-const saveCollection = () => ls.set('nx4.collection', S.collection);
+// Fotos de los registros: van en IndexedDB (mucho espacio y guardadas como imagen), no dentro de localStorage
+// (unos 5 MB y como texto). En memoria cada registro tiene userPhoto como URL lista para mostrar (blob:);
+// en localStorage solo queda la referencia «ph». Sin IndexedDB, la foto sigue dentro del registro, como antes.
+const PH_DB = 'nx4-photos', PH_STORE = 'photos';
+let phDbP = null, phLastOk = true, phPersistAsked = false, phGcT = 0, phFullT = 0;
+const phBusy = new Set();
+const isData = (u) => typeof u === 'string' && u.startsWith('data:');
+function phDb() {
+  if (!phDbP) {
+    phDbP = new Promise((res, rej) => {
+      if (!window.indexedDB) { rej(new Error('sin IndexedDB')); return; }
+      const r = indexedDB.open(PH_DB, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore(PH_STORE);
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+      r.onblocked = () => rej(new Error('IndexedDB bloqueado'));
+    });
+    phDbP.catch(() => { /* queda como antes: fotos dentro del registro */ });
+  }
+  return phDbP;
+}
+async function phTx(mode, fn) {
+  const db = await phDb();
+  return new Promise((res, rej) => {
+    const t = db.transaction(PH_STORE, mode, { durability: 'strict' }), req = fn(t.objectStore(PH_STORE));
+    t.oncomplete = () => res(req?.result);
+    t.onerror = t.onabort = () => rej(t.error || new Error('No se pudo guardar la foto'));
+  });
+}
+function dataToBlob(d) {
+  const i = d.indexOf(','), bin = atob(d.slice(i + 1)), u = new Uint8Array(bin.length);
+  for (let k = 0; k < bin.length; k++) u[k] = bin.charCodeAt(k);
+  return new Blob([u], { type: (d.slice(5, i).split(';')[0]) || 'image/jpeg' });
+}
+// Escribe los registros sin las fotos ya guardadas en IndexedDB. Devuelve false si no hubo espacio.
+function writeCollection() {
+  const rows = S.collection.map((o) => {
+    const r = { ...o };
+    if (r.ph && (r.userPhoto == null || String(r.userPhoto).startsWith('blob:'))) delete r.userPhoto;
+    else { delete r.ph; if (String(r.userPhoto || '').startsWith('blob:')) delete r.userPhoto; }
+    return r;
+  });
+  try { localStorage.setItem('nx4.collection', JSON.stringify(rows)); phLastOk = true; } catch { phLastOk = false; }
+  return phLastOk;
+}
+function phFull() {
+  if (Date.now() - phFullT < 8000) return;
+  phFullT = Date.now();
+  toast('Sin espacio en este teléfono: el último cambio no quedó guardado. Libera espacio o exporta y elimina registros antiguos.');
+}
+// Pasa a IndexedDB las fotos que aún están como texto (registros nuevos y, la primera vez, todas las antiguas).
+async function phFlush(list) {
+  list.forEach((o) => phBusy.add(o));
+  let stored = 0, i = 0;
+  try {
+    for (; i < list.length; i++) {
+      const o = list[i], data = o.userPhoto;
+      try {
+        const key = `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`, blob = dataToBlob(data);
+        await phTx('readwrite', (st) => st.put(blob, key));
+        // Si la foto cambió mientras se guardaba, la copia queda huérfana y la limpieza la borra.
+        if (o.userPhoto === data) { o.ph = key; o.userPhoto = URL.createObjectURL(blob); stored++; }
+      } finally { phBusy.delete(o); }
+    }
+  } catch { /* sin IndexedDB o sin espacio: esas fotos quedan dentro del registro */ }
+  list.slice(i).forEach((o) => phBusy.delete(o));
+  if (!writeCollection()) phFull();
+  if (stored) { phAskPersist(); phGcSoon(); }
+}
+function saveCollection() {
+  const pending = S.collection.filter((o) => isData(o.userPhoto) && !phBusy.has(o));
+  const ok = writeCollection();
+  if (pending.length) phFlush(pending);
+  else if (!ok && !phBusy.size) phFull();
+  phGcSoon();
+}
+// Pide al navegador no borrar estos datos cuando el teléfono se queda sin espacio.
+function phAskPersist() {
+  if (phPersistAsked) return;
+  phPersistAsked = true;
+  navigator.storage?.persist?.().catch(() => {});
+}
+// Borra de IndexedDB las fotos que ningún registro usa (registros eliminados o fotos cambiadas).
+function phGcSoon() { clearTimeout(phGcT); phGcT = setTimeout(phGc, 3000); }
+async function phGc() {
+  if (phBusy.size) { phGcSoon(); return; }
+  if (!phLastOk) return; // lo guardado aún podría usar fotos que en memoria ya no están
+  try {
+    const used = new Set(S.collection.map((o) => o.ph).filter(Boolean));
+    const keys = await phTx('readonly', (st) => st.getAllKeys());
+    const del = (keys || []).filter((k) => !used.has(k));
+    if (del.length && !phBusy.size) await phTx('readwrite', (st) => { del.forEach((k) => st.delete(k)); });
+  } catch { /* sin IndexedDB */ }
+}
+// Al abrir: carga las fotos de IndexedDB y, si quedan fotos como texto (versiones anteriores), las migra.
+async function phLoad() {
+  const need = S.collection.filter((o) => o.ph && !o.userPhoto);
+  if (need.length) {
+    try {
+      const db = await phDb();
+      await new Promise((res, rej) => {
+        const t = db.transaction(PH_STORE, 'readonly'), st = t.objectStore(PH_STORE);
+        need.forEach((o) => { const r = st.get(o.ph); r.onsuccess = () => { if (r.result instanceof Blob) o.userPhoto = URL.createObjectURL(r.result); }; });
+        t.oncomplete = res;
+        t.onerror = t.onabort = () => rej(t.error);
+      });
+      renderPhotoPins();
+      if (['inicio', 'coleccion', 'herbario', 'nuevo'].includes(route().name)) show();
+    } catch { /* sin IndexedDB: se muestra la foto de iNaturalist */ }
+  }
+  if (S.collection.some((o) => isData(o.userPhoto))) saveCollection();
+  else phGcSoon();
+}
 // Alias: apodos tuyos por especie (id de iNaturalist o, si no tiene, nombre científico). Solo en este teléfono.
 let aliases = ls.get('nx4.aliases', []);
 const saveAliases = () => ls.set('nx4.aliases', aliases);
@@ -2946,4 +3058,5 @@ applyTabs();
 renderAd();
 renderOfflineBadge();
 show();
+phLoad();
 loadArea();

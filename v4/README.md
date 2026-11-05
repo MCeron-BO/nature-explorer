@@ -76,3 +76,12 @@ Técnicamente: `sw.js` es un *service worker* (app y librerías guardadas; APIs 
 ## Datos guardados
 
 En `localStorage` con claves propias (`nx4.settings`, `nx4.collection`, `nx4.game`, `nx4.aliases`, `nx4.taxa`), separadas de las otras versiones.
+
+**Fotos de los registros en IndexedDB** (base `nx4-photos`): las fotos de capturas y nuevos registros se guardan como imagen en IndexedDB, que tiene mucho más espacio que `localStorage` (unos 5 MB). En `nx4.collection` cada registro guarda solo la referencia a su foto (`ph`), así que 200 registros con foto ocupan unos 40 KB en vez de varios MB.
+
+- **Migración automática:** al abrir esta versión, las fotos que estaban dentro de los registros se copian a IndexedDB y, solo cuando quedaron guardadas, se quitan de `localStorage`. Si algo falla a mitad, no se pierde nada: se reintenta la próxima vez.
+- **Limpieza:** las fotos de registros eliminados (o reemplazadas) se borran solas de IndexedDB unos segundos después.
+- **Almacenamiento persistente:** al guardar la primera foto la app pide al navegador (`navigator.storage.persist()`) que no borre estos datos si el teléfono se queda sin espacio.
+- **Aviso sin espacio:** si un registro no se puede guardar, aparece el aviso «Sin espacio en este teléfono…» en vez de perderse sin avisar.
+- Sin IndexedDB (navegadores muy antiguos), la foto queda dentro del registro, como en versiones anteriores.
+- Sigue siendo almacenamiento del teléfono: borrar los datos del navegador o cambiar de teléfono elimina las fotos.
