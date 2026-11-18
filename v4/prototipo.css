@@ -734,3 +734,10 @@ body.is-offline .map-title span:not(.logo-leaf){color:#B23A2E;font-weight:800}
 .avc i::after{content:'';position:absolute;inset:0;border-radius:999px;border:2px solid #fff}
 .avc-zoom{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:700;color:var(--ink2)}
 .avc-zoom input{flex:1;accent-color:var(--g900)}
+
+/* Mapa del nuevo registro: ocultar/mostrar y coordenadas UTM */
+.nv-row .chip-btn+.chip-btn{margin-left:-4px}
+.chip-btn.nv-map-tg{display:inline-flex;align-items:center;gap:5px;padding:0 12px;background:#fff;border:1px solid var(--line2);color:var(--ink2)}
+.chip-btn.nv-map-tg svg{width:16px;height:16px}
+.nv-utm{position:absolute;left:8px;bottom:8px;z-index:500;max-width:calc(100% - 70px);padding:4px 8px;border-radius:8px;background:rgba(15,30,24,.78);color:#fff;font-size:11.5px;font-variant-numeric:tabular-nums;line-height:1.3;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nv-utm b{font-weight:800;margin-right:2px}
