@@ -37,7 +37,7 @@ Abre http://localhost:5176
 
 - En la ficha de cada especie, **+ Agregar alias** guarda un apodo tuyo (por ejemplo «bambú AS»). Sugiere abreviaturas con un toque: primera palabra + iniciales («Aguja DP»), solo iniciales («ADP») o el científico abreviado («E. cicutarium»). Una especie puede tener varios alias; si repites uno en dos especies, la búsqueda muestra ambas.
 - El buscador del mapa, el de Especies y «Buscar en catálogo» de Nuevo registro revisan tus alias **primero**, sin importar mayúsculas, tildes ni espacios («bambu as», «BambúAS»). Los resultados con alias llevan la etiqueta ★. Además reconocen las iniciales del nombre común aunque no tengas alias («adp» → Aguja del pastor).
-- **Más › Mis alias** lista todos para editarlos (toca el alias), eliminarlos (X), abrir la ficha, y **Exportar / Importar** un archivo `.json` para respaldarlos o pasarlos a otro teléfono.
+- Los alias se crean, editan y eliminan desde la ficha de cada especie (la lista «Mis alias» ya no está en el menú Más).
 - Se guardan solo en este teléfono (`nx4.aliases`), por especie (id de iNaturalist o nombre científico), y funcionan sin conexión.
 
 ## Mi Herbario

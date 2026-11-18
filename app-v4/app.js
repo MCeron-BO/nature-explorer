@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.17';
+const APP_VERSION = '1.0.18';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -490,7 +490,6 @@ function openMore() {
     <div class="menu">
       <button data-act="profile">${I.star}<span>Perfil, avatar y logros</span>${I.right}</button>
       <button data-act="guide-start">${I.book}<span>Guía de uso (recorrido interactivo)</span>${I.right}</button>
-      <button data-act="aliases">${I.star}<span>Mis alias de especies</span>${I.right}</button>
       <button data-act="open-settings">${I.filter}<span>Ajustes: ubicación, sonido e IA</span>${I.right}</button>
       <button data-act="credits">${I.book}<span>Créditos del mapa y los datos</span>${I.right}</button>
       <button data-act="offline">${I.dl}<span>Mapa sin conexión</span>${I.right}</button>
