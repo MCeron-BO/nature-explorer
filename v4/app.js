@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.19';
+const APP_VERSION = '1.0.20';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -2282,8 +2282,15 @@ function renderHerbSpecies(famName, genName, e) {
   const tm = (o) => o.when || o.date || '';
   const recs = herbRecords().filter((o) => o.taxonId === e.id).sort((a, b) => tm(b).localeCompare(tm(a)));
   const reg = recs.filter((o) => o.kind === 'nuevo'), capt = recs.filter((o) => o.kind !== 'nuevo');
-  if (S.hbTabFor !== e.id) { S.hbTabFor = e.id; S.hbTab = reg.length || !capt.length ? 'reg' : 'cap'; S.misSel?.clear(); }
-  const tab = S.hbTab, rows = tab === 'reg' ? reg : capt;
+  if (S.hbTabFor !== e.id) { S.hbTabFor = e.id; S.hbTab = reg.length || !capt.length ? 'reg' : 'cap'; S.hbDay = ''; S.misSel?.clear(); }
+  const tab = S.hbTab, all = tab === 'reg' ? reg : capt;
+  // Filtros: más recientes, más antiguos o un día concreto (por defecto, el del registro más reciente).
+  const ord = S.hbOrd || 'rec', dayOf = (o) => tm(o).slice(0, 10);
+  const day = ord === 'dia' ? (S.hbDay || (all[0] ? dayOf(all[0]) : today())) : '';
+  const rows = ord === 'old' ? [...all].reverse() : ord === 'dia' ? all.filter((o) => dayOf(o) === day) : all;
+  const dayTxt = day ? new Date(`${day}T12:00`).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+  const OL = { rec: 'Recientes', old: 'Más antiguos', dia: 'Por fecha' };
+  const days = [...new Set(all.map(dayOf).filter(Boolean))];
   const sel = S.misSel || (S.misSel = new Set());
   for (const u of [...sel]) if (!rows.some((o) => o.uid === u)) sel.delete(u);
   const tabBtn = (id, l, n) => `<button role="tab" class="${tab === id ? 'on' : ''}" aria-selected="${tab === id}" data-hbtab="${id}">${l} <small>${nf(n)}</small></button>`;
@@ -2291,9 +2298,12 @@ function renderHerbSpecies(famName, genName, e) {
     <div class="hb-body hb-recs">
       <div class="hb-rec-top"><span>${herbRanged() ? `Registros ${esc(rangeText())}` : 'Todos tus registros de esta especie'}</span><a class="dl-mini" href="#ficha/${e.id}">${I.book}<span>Ver ficha</span></a></div>
       <div class="nv-tabs" role="tablist">${tabBtn('reg', 'Mis registros', reg.length)}${tabBtn('cap', 'Mis capturas', capt.length)}</div>
-      <div class="flow mr">${rows.length ? `<div class="mr-tools"><label class="mr-ck"><input type="checkbox" data-mr-all="1" ${rows.length && sel.size === rows.length ? 'checked' : ''} aria-label="Seleccionar todos"></label><span>${nf(rows.length)} ${tab === 'reg' ? `registro${rows.length === 1 ? '' : 's'}` : `captura${rows.length === 1 ? '' : 's'}`} · más recientes primero</span></div>${rows.map((o) => recRow(o, sel, true)).join('')}`
-        : `<div class="state">${tab === 'reg' ? 'No tienes nuevos registros de esta especie.' : 'No has capturado esta especie en el mapa.'}</div>`}
+      ${all.length ? `<div class="mr-filters hb-filters" role="group" aria-label="Filtrar ${tab === 'reg' ? 'registros' : 'capturas'}">${Object.entries(OL).map(([id, l]) => `<button class="rad ${ord === id ? 'on' : ''}" data-hbord="${id}" aria-pressed="${ord === id}">${id === 'dia' ? I.cal : ''}${l}</button>`).join('')}</div>
+      ${ord === 'dia' ? `<div class="hb-day"><label>${I.cal}<span>Día</span><input type="date" id="hb-day" value="${esc(day)}" max="${today()}" aria-label="Fecha de los ${tab === 'reg' ? 'registros' : 'capturas'}"></label>${days.length > 1 ? `<div class="hb-days">${days.slice(0, 12).map((d) => `<button class="${d === day ? 'on' : ''}" data-hbday="${d}">${esc(new Date(`${d}T12:00`).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' }))}</button>`).join('')}</div>` : ''}</div>` : ''}` : ''}
+      <div class="flow mr">${rows.length ? `<div class="mr-tools"><label class="mr-ck"><input type="checkbox" data-mr-all="1" ${rows.length && sel.size === rows.length ? 'checked' : ''} aria-label="Seleccionar todos"></label><span>${nf(rows.length)} ${tab === 'reg' ? `registro${rows.length === 1 ? '' : 's'}` : `captura${rows.length === 1 ? '' : 's'}`} · ${ord === 'old' ? 'más antiguos primero' : ord === 'dia' ? `del ${esc(dayTxt)}` : 'más recientes primero'}</span></div>${rows.map((o) => recRow(o, sel, true)).join('')}`
+        : `<div class="state">${!all.length ? (tab === 'reg' ? 'No tienes nuevos registros de esta especie.' : 'No has capturado esta especie en el mapa.') : `No tienes ${tab === 'reg' ? 'registros' : 'capturas'} de esta especie el ${esc(dayTxt)}.`}</div>`}
       ${recBar(sel.size)}</div></div>`;
+  $('#hb-day')?.addEventListener('change', (ev) => { if (ev.target.value) { S.hbDay = ev.target.value; S.misSel?.clear(); renderHerbario(route().arg); } });
   el.scrollTop = 0;
 }
 function renderHerbario(arg) {
@@ -2964,7 +2974,9 @@ document.addEventListener('click', async (e) => {
   if (d.pick) { S.capture.pick = Number(d.pick); renderCaptura(); return; }
   if (d.nvtab) { S.nvTab = d.nvtab; if (d.nvtab === 'nuevo' && S.nuevo?.saved) S.nuevo = null; renderNuevo(); $('#s-nuevo').scrollTop = 0; return; }
   if (d.mrf) { S.misF = d.mrf; renderMisRegistros(); return; }
-  if (d.hbtab) { S.hbTab = d.hbtab; S.misSel?.clear(); renderHerbario(route().arg); return; }
+  if (d.hbord) { S.hbOrd = d.hbord; S.misSel?.clear(); renderHerbario(route().arg); return; }
+  if (d.hbday) { S.hbDay = d.hbday; S.misSel?.clear(); renderHerbario(route().arg); return; }
+  if (d.hbtab) { S.hbTab = d.hbtab; S.hbDay = ''; S.misSel?.clear(); renderHerbario(route().arg); return; }
   if (d.mrMore) { openRecMenu(d.mrMore); return; }
   if (d.mrOpen) { openRecEdit(d.mrOpen); return; }
   if (d.mrAct) {
