@@ -46,9 +46,10 @@ Abre http://localhost:5176
 
 1. **Familias:** tarjetas con el nombre de la familia, «N especies descubiertas», su nombre común y la foto de una de sus especies.
 2. **Géneros** de la familia: tarjetas con foto y cuántas especies llevas en cada uno.
-3. **Especies** del género: foto tuya (o de iNaturalist), nombre, cuántas veces la registraste y la fecha del último registro; abre la ficha. Tiene buscador (también por alias).
+3. **Especies** del género: foto tuya (o de iNaturalist), nombre, cuántos **registros** (nuevos registros) y cuántas **capturas** (desde el mapa) llevas de ella, y la fecha del último. Tiene buscador (también por alias).
+4. **Detalle de la especie** (al tocar una especie o su flecha): pestañas **Mis registros** y **Mis capturas**, cada una con su cantidad, con la misma lista de Mis Registros (foto, estado, fecha · lugar, menú ⋮, casillas para **Eliminar** o **Exportar** los seleccionados), de lo más reciente a lo más antiguo. El botón **Ver ficha** abre la ficha de la especie.
 
-En los tres niveles se ordena por **Más completados**, **Recientes** o **Por fecha** (primer descubrimiento). Con **Por fecha** aparecen **Desde / Hasta** para ver solo los registros de un rango de fechas (la X lo quita). **Exportar** descarga en CSV o KML los registros de lo que estás viendo (todo el herbario, una familia o un género), con el orden, el rango de fechas y la búsqueda aplicados; antes muestra un resumen de los filtros. El CSV incluye familia, género, tipo (captura o nuevo registro), quién la identificó, fecha, coordenadas, lugar y notas. La familia y el género salen de la taxonomía de iNaturalist y se guardan en el teléfono (`nx4.taxa`), así que el herbario funciona sin conexión.
+En los tres primeros niveles se ordena por **Más completados**, **Recientes** o **Por fecha** (primer descubrimiento). Con **Por fecha** aparecen **Desde / Hasta** para ver solo los registros de un rango de fechas (la X lo quita). **Exportar** descarga en CSV o KML los registros de lo que estás viendo (todo el herbario, una familia o un género), con el orden, el rango de fechas y la búsqueda aplicados; antes muestra un resumen de los filtros. El CSV incluye familia, género, tipo (captura o nuevo registro), quién la identificó, fecha, coordenadas, lugar y notas. La familia y el género salen de la taxonomía de iNaturalist y se guardan en el teléfono (`nx4.taxa`), así que el herbario funciona sin conexión.
 
 ## Tus fotos en el mapa
 

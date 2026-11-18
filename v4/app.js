@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.14';
+const APP_VERSION = '1.0.15';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -1927,9 +1927,21 @@ async function nuevoGallery() {
 // Lista de tus nuevos registros: filtros, orden, selección para eliminar o exportar, e identificación con IA.
 const aiNow = new Set(), aiTried = new Set(), placeTried = new Set();
 let aiBusy = false, placeBusy = false;
-const recDate = (o) => (o.when ? new Date(o.when).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' }) : o.date || '');
+const recDate = (o) => (o.when || o.date ? new Date(o.when || `${o.date}T12:00`).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
 const recName = (o) => (o.taxonId ? o.common || o.sci : 'Sin identificar');
-const refreshMis = () => { if (route().name === 'nuevo' && S.nvTab === 'mis') renderMisRegistros(); };
+// Vuelve a dibujar las listas de registros visibles: Mis Registros o el detalle de una especie en Mi Herbario.
+const hbDetail = () => route().name === 'herbario' && (route().arg || '').split('~').length > 2;
+const refreshMis = () => {
+  if (route().name === 'nuevo' && S.nvTab === 'mis') renderMisRegistros();
+  else if (hbDetail()) renderHerbario(route().arg);
+};
+const recSt = (o) => aiNow.has(o.uid) ? '<span class="mr-st ai"><i class="spin-s"></i>IA…</span>'
+  : o.taxonId ? `<span class="mr-st ok" title="Identificada">${I.check}${o.idBy === 'ia' && o.conf != null ? `IA ${o.conf}%` : 'Identificada'}</span>` : '<span class="mr-st no">Sin identificar</span>';
+const recRow = (o, sel) => `<div class="mr-row ${sel.has(o.uid) ? 'on' : ''}"><label class="mr-ck"><input type="checkbox" data-mr-ck="${esc(o.uid)}" ${sel.has(o.uid) ? 'checked' : ''} aria-label="Seleccionar ${esc(recName(o))}"></label>
+    <span class="mr-ph" style="background-image:url('${esc(o.userPhoto || o.photo)}')"></span>
+    <div class="info"><div class="l1"><b>${esc(recName(o))}</b>${o.taxonId || aiNow.has(o.uid) || recName(o) !== 'Sin identificar' ? recSt(o) : ''}</div>${o.taxonId && o.common ? `<i class="sci">${esc(o.sci)}</i>` : ''}<span class="l3">${I.cal}${esc(recDate(o))}<em>·</em>${I.pin}<span>${esc(o.place || (o.lat != null ? `${o.lat.toFixed(4)}, ${o.lng.toFixed(4)}` : 'Sin ubicación'))}</span></span></div>
+    <button class="mr-more" data-mr-more="${esc(o.uid)}" aria-label="Opciones de ${esc(recName(o))}">⋮</button></div>`;
+const recBar = (nSel) => `<div class="mr-bar"><button data-act="mr-del" ${nSel ? '' : 'disabled'}>${I.trash}<span>Eliminar<small>(${nSel} seleccionado${nSel === 1 ? '' : 's'})</small></span></button><i></i><button data-act="mr-exp" ${nSel ? '' : 'disabled'}>${I.dl}<span>Exportar<small>(${nSel} seleccionado${nSel === 1 ? '' : 's'})</small></span></button></div>`;
 function renderMisRegistros() {
   const el = $('#s-nuevo');
   const f = S.misF || 'todas', sort = S.misSort || 'reciente';
@@ -1944,12 +1956,7 @@ function renderMisRegistros() {
   const fOpen = settings.misFOpen !== false;
   const FL = { todas: 'Todas', ident: 'Identificadas', sin: 'Sin identificar' };
   const SL = { reciente: 'Más recientes', antiguo: 'Más antiguos', nombre: 'Nombre (A-Z)' };
-  const st = (o) => aiNow.has(o.uid) ? '<span class="mr-st ai"><i class="spin-s"></i>IA…</span>'
-    : o.taxonId ? `<span class="mr-st ok" title="Identificada">${I.check}${o.idBy === 'ia' && o.conf != null ? `IA ${o.conf}%` : 'Identificada'}</span>` : '<span class="mr-st no">Sin identificar</span>';
-  const row = (o) => `<div class="mr-row ${sel.has(o.uid) ? 'on' : ''}"><label class="mr-ck"><input type="checkbox" data-mr-ck="${esc(o.uid)}" ${sel.has(o.uid) ? 'checked' : ''} aria-label="Seleccionar ${esc(recName(o))}"></label>
-    <span class="mr-ph" style="background-image:url('${esc(o.userPhoto || o.photo)}')"></span>
-    <div class="info"><div class="l1"><b>${esc(recName(o))}</b>${o.taxonId || aiNow.has(o.uid) || recName(o) !== 'Sin identificar' ? st(o) : ''}</div>${o.taxonId && o.common ? `<i class="sci">${esc(o.sci)}</i>` : ''}<span class="l3">${I.cal}${esc(recDate(o))}<em>·</em>${I.pin}<span>${esc(o.place || (o.lat != null ? `${o.lat.toFixed(4)}, ${o.lng.toFixed(4)}` : 'Sin ubicación'))}</span></span></div>
-    <button class="mr-more" data-mr-more="${esc(o.uid)}" aria-label="Opciones de ${esc(recName(o))}">⋮</button></div>`;
+  const row = (o) => recRow(o, sel);
   const hint = !pending ? '' : !settings.token ? `<div class="mr-hint">${I.ai}<span>La IA identifica sola tus registros «Sin identificar». Para activarla agrega tu token de iNaturalist en <button data-act="open-settings">Ajustes</button>.</span></div>`
     : !navigator.onLine ? `<div class="mr-hint">${I.ai}<span>Sin conexión: la IA identificará tus registros al volver la señal.</span></div>` : '';
   el.innerHTML = `<header class="head"><div class="title-row"><a href="#mapa" class="icon-btn" aria-label="Volver al mapa">${I.back}</a><div style="flex:1;min-width:0"><h1>Mis Registros</h1><span class="muted" style="font-size:12px">${nf(all.length)} registro${all.length === 1 ? '' : 's'}${pending ? ` · ${nf(pending)} sin identificar` : ''}</span></div></div>${nvTabs('mis')}
@@ -1957,7 +1964,7 @@ function renderMisRegistros() {
     ${fOpen ? `<div class="mr-filters">${Object.entries(FL).map(([id, l]) => `<button class="rad ${f === id ? 'on' : ''}" data-mrf="${id}" aria-pressed="${f === id}">${l}</button>`).join('')}</div>
     <div class="mr-tools"><label class="mr-ck"><input type="checkbox" data-mr-all="1" ${rows.length && nSel === rows.length ? 'checked' : ''} aria-label="Seleccionar todos"></label><span>Ordenar por:</span><select id="mr-sort" aria-label="Ordenar registros">${Object.entries(SL).map(([id, l]) => `<option value="${id}" ${sort === id ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` : ''}</header>
     <div class="flow mr">${hint}${rows.length ? rows.map(row).join('') : `<div class="state">${all.length ? 'No hay registros con este filtro.' : 'Aún no tienes registros. Toca «Nuevo Registro» para empezar.'}</div>`}
-    <div class="mr-bar"><button data-act="mr-del" ${nSel ? '' : 'disabled'}>${I.trash}<span>Eliminar<small>(${nSel} seleccionado${nSel === 1 ? '' : 's'})</small></span></button><i></i><button data-act="mr-exp" ${nSel ? '' : 'disabled'}>${I.dl}<span>Exportar<small>(${nSel} seleccionado${nSel === 1 ? '' : 's'})</small></span></button></div></div>`;
+    ${recBar(nSel)}</div>`;
   $('#mr-sort')?.addEventListener('change', (e) => { S.misSort = e.target.value; renderMisRegistros(); });
   autoIdentify();
   fillPlaces();
@@ -2172,11 +2179,12 @@ function herbSpecies() {
     const when = o.when || o.date || '';
     let e = by.get(o.taxonId);
     if (!e) {
-      e = { id: o.taxonId, sci: o.sci, common: o.common, photo: o.photo || zone?.photo || '', user: o.userPhoto || '', obs: 0, last: '', first: when,
+      e = { id: o.taxonId, sci: o.sci, common: o.common, photo: o.photo || zone?.photo || '', user: o.userPhoto || '', obs: 0, nReg: 0, nCap: 0, last: '', first: when,
         f: t?.f || zone?.family || '', fc: t?.fc || '', g: t?.g || String(o.sci || '').split(' ')[0] };
       by.set(o.taxonId, e);
     }
     e.obs++;
+    if (o.kind === 'nuevo') e.nReg++; else e.nCap++;
     if (when > e.last) { e.last = when; if (o.userPhoto) e.user = o.userPhoto; }
     if (when && when < e.first) e.first = when;
   }
@@ -2223,6 +2231,27 @@ function openHerbExport() {
     <div class="hb-exp-sum"><span><b>Vista</b>${esc(where)}</span><span><b>Orden</b>${esc(sortL)}</span><span><b>Fechas</b>${herbRanged() ? esc(rangeText()) : 'Todas'}</span>${S.hbQ && gen ? `<span><b>Búsqueda</b>«${esc(S.hbQ)}»</span>` : ''}<span><b>Registros</b>${nf(list.length)}</span></div>
     ${list.length ? `<div class="two"><button class="btn" data-hb-exp="csv">${I.dl}CSV (Excel)</button><button class="btn light" data-hb-exp="kml">${I.pin}KML (mapa)</button></div>` : '<p class="muted" style="margin:0">No hay registros con estos filtros.</p>'}`);
 }
+// Detalle de una especie del herbario: tus nuevos registros y tus capturas, en pestañas.
+function renderHerbSpecies(famName, genName, e) {
+  const el = $('#s-herbario'), back = `#herbario/${encodeURIComponent(`${famName}~${genName}`)}`;
+  if (!e) { el.innerHTML = `<div class="state">Ya no tienes registros de esta especie. <a href="${back}">Volver a ${esc(genName)}</a></div>`; return; }
+  const tm = (o) => o.when || o.date || '';
+  const recs = herbRecords().filter((o) => o.taxonId === e.id).sort((a, b) => tm(b).localeCompare(tm(a)));
+  const reg = recs.filter((o) => o.kind === 'nuevo'), capt = recs.filter((o) => o.kind !== 'nuevo');
+  if (S.hbTabFor !== e.id) { S.hbTabFor = e.id; S.hbTab = reg.length || !capt.length ? 'reg' : 'cap'; S.misSel?.clear(); }
+  const tab = S.hbTab, rows = tab === 'reg' ? reg : capt;
+  const sel = S.misSel || (S.misSel = new Set());
+  for (const u of [...sel]) if (!rows.some((o) => o.uid === u)) sel.delete(u);
+  const tabBtn = (id, l, n) => `<button role="tab" class="${tab === id ? 'on' : ''}" aria-selected="${tab === id}" data-hbtab="${id}">${l} <small>${nf(n)}</small></button>`;
+  el.innerHTML = `<header class="hb-hero" style="background-image:url('${esc((e.photo || '').replace('square', 'medium') || e.user)}')"><a class="fab round back" href="${back}" aria-label="Volver a ${esc(genName)}">${I.back}</a><div><h1>${esc(e.common || e.sci)}</h1><span>${e.common ? `<i>${esc(e.sci)}</i> · ` : ''}${esc(famName)}</span></div></header>
+    <div class="hb-body hb-recs">
+      <div class="hb-rec-top"><span>${herbRanged() ? `Registros ${esc(rangeText())}` : 'Todos tus registros de esta especie'}</span><a class="dl-mini" href="#ficha/${e.id}">${I.book}<span>Ver ficha</span></a></div>
+      <div class="nv-tabs" role="tablist">${tabBtn('reg', 'Mis registros', reg.length)}${tabBtn('cap', 'Mis capturas', capt.length)}</div>
+      <div class="flow mr">${rows.length ? `<div class="mr-tools"><label class="mr-ck"><input type="checkbox" data-mr-all="1" ${rows.length && sel.size === rows.length ? 'checked' : ''} aria-label="Seleccionar todos"></label><span>${nf(rows.length)} ${tab === 'reg' ? `registro${rows.length === 1 ? '' : 's'}` : `captura${rows.length === 1 ? '' : 's'}`} · más recientes primero</span></div>${rows.map((o) => recRow(o, sel)).join('')}`
+        : `<div class="state">${tab === 'reg' ? 'No tienes nuevos registros de esta especie.' : 'No has capturado esta especie en el mapa.'}</div>`}
+      ${recBar(sel.size)}</div></div>`;
+  el.scrollTop = 0;
+}
 function renderHerbario(arg) {
   const el = $('#s-herbario');
   const list = herbSpecies();
@@ -2253,6 +2282,8 @@ function renderHerbario(arg) {
     return;
   }
   let sp = famItems.filter((e) => (e.g || 'Sin clasificar') === genName);
+  const spId = arg.split('~')[2];
+  if (spId) { renderHerbSpecies(famName, genName, sp.find((e) => String(e.id) === spId)); return; }
   if (!sp.length) { el.innerHTML = `<div class="state">${herbRanged() ? `No hay registros de ${esc(genName)} ${esc(rangeText())}. <button class="chip-btn" data-act="hb-range-clear">Quitar el rango</button>` : 'Este álbum ya no tiene especies.'} <a href="#herbario/${encodeURIComponent(famName)}">Volver a ${esc(famName)}</a></div>`; return; }
   const q = fold(S.hbQ || '');
   const shown = sp.filter((e) => !q || fold(`${e.common} ${e.sci}`).includes(q) || aliasHit({ inatId: e.id, sci: e.sci }, S.hbQ));
@@ -2261,7 +2292,7 @@ function renderHerbario(arg) {
     <div class="hb-body"><div class="hb-card"><div class="hb-card-h"><span class="hb-sp-ic">${I.leaf}</span><div style="flex:1;min-width:0"><b>Especies (${sp.length})</b><p>Listado de especies del género ${esc(genName)} que has registrado.</p></div><button class="hb-info" data-act="hb-search" aria-label="Buscar en este género">${I.search}</button></div>
       ${S.hbSearch ? `<div class="search">${I.search}<label for="hb-q" class="sr">Buscar especie en el género</label><input id="hb-q" type="search" placeholder="Nombre, científico o alias" value="${esc(S.hbQ || '')}" autocomplete="off"></div>` : ''}</div>
     ${herbChips(sort)}
-    <div class="hb-list">${shown.map((e) => `<a class="hb-sp" href="#ficha/${e.id}"><span class="ph" style="background-image:url('${esc(e.user || e.photo)}')"></span><span class="nm"><b>${esc(e.common || e.sci)}</b>${e.common ? `<i>${esc(e.sci)}</i>` : ''}</span><span class="meta"><span>${I.book}${nf(e.obs)} obs.</span><span>${I.cal}${esc(herbDate(e.last))}</span></span>${I.right}</a>`).join('') || '<div class="state">Sin coincidencias.</div>'}</div></div>`;
+    <div class="hb-list">${shown.map((e) => `<a class="hb-sp" href="#herbario/${encodeURIComponent(`${famName}~${genName}~${e.id}`)}" aria-label="Ver tus registros y capturas de ${esc(e.common || e.sci)}"><span class="ph" style="background-image:url('${esc(e.user || e.photo)}')"></span><span class="nm"><b>${esc(e.common || e.sci)}</b>${e.common ? `<i>${esc(e.sci)}</i>` : ''}</span><span class="meta">${e.nReg ? `<span>${I.book}${nf(e.nReg)} registro${e.nReg === 1 ? '' : 's'}</span>` : ''}${e.nCap ? `<span>${I.cam}${nf(e.nCap)} captura${e.nCap === 1 ? '' : 's'}</span>` : ''}<span>${I.cal}${esc(herbDate(e.last))}</span></span>${I.right}</a>`).join('') || '<div class="state">Sin coincidencias.</div>'}</div></div>`;
   bindHerbRange(arg);
   const inp = $('#hb-q');
   if (inp) { inp.addEventListener('input', () => { S.hbQ = inp.value; const pos = inp.selectionStart; renderHerbario(arg); const n = $('#hb-q'); n.focus(); n.setSelectionRange(pos, pos); }); }
@@ -2889,6 +2920,7 @@ document.addEventListener('click', async (e) => {
   if (d.pick) { S.capture.pick = Number(d.pick); renderCaptura(); return; }
   if (d.nvtab) { S.nvTab = d.nvtab; if (d.nvtab === 'nuevo' && S.nuevo?.saved) S.nuevo = null; renderNuevo(); $('#s-nuevo').scrollTop = 0; return; }
   if (d.mrf) { S.misF = d.mrf; renderMisRegistros(); return; }
+  if (d.hbtab) { S.hbTab = d.hbtab; S.misSel?.clear(); renderHerbario(route().arg); return; }
   if (d.mrMore) { openRecMenu(d.mrMore); return; }
   if (d.mrAct) {
     const [a, uid] = d.mrAct.split(/:(.*)/s), o = S.collection.find((c) => c.uid === uid);
@@ -3031,8 +3063,8 @@ document.addEventListener('change', (e) => {
     else { settings.tabs[opt] = e.target.checked; saveSettings(); applyTabs(); }
     return;
   }
-  if (e.target.dataset?.mrCk) { const u = e.target.dataset.mrCk; e.target.checked ? S.misSel.add(u) : S.misSel.delete(u); renderMisRegistros(); return; }
-  if (e.target.dataset?.mrAll) { const rows = [...document.querySelectorAll('[data-mr-ck]')].map((x) => x.dataset.mrCk); rows.forEach((u) => (e.target.checked ? S.misSel.add(u) : S.misSel.delete(u))); renderMisRegistros(); return; }
+  if (e.target.dataset?.mrCk) { const u = e.target.dataset.mrCk; (S.misSel ||= new Set()); e.target.checked ? S.misSel.add(u) : S.misSel.delete(u); refreshMis(); return; }
+  if (e.target.dataset?.mrAll) { const rows = [...document.querySelectorAll('[data-mr-ck]')].map((x) => x.dataset.mrCk); rows.forEach((u) => (e.target.checked ? S.misSel.add(u) : S.misSel.delete(u))); refreshMis(); return; }
   const f = e.target.files?.[0];
   if (!f) return;
   if (e.target.dataset.alImport) { importAliases(f); return; }
