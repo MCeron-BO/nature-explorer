@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.12';
+const APP_VERSION = '1.0.13';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -1566,6 +1566,7 @@ function updateNvLoc() {
   const n = S.nuevo, a = $('#nv-loc-t'), b = $('#nv-loc-s');
   if (!n || !a) return;
   [a.textContent, b.textContent] = nvLocTexts(n);
+  updateNvUtm();
 }
 function renderNuevo() {
   const el = $('#s-nuevo');
@@ -1595,20 +1596,19 @@ function renderNuevo() {
   const ident = later
     ? `<div class="nv-later">${I.ai}<span><b>Se guardará como «Sin identificar»</b>${settings.token ? 'En Mis Registros la IA de iNaturalist la identifica automáticamente y puedes cambiar la especie si no es correcta.' : 'En Mis Registros la IA la identifica automáticamente cuando agregues tu token de iNaturalist en Ajustes.'}</span></div>`
     : `${recent.length ? `<div class="nv-recent"><span class="nv-recent-k">Registradas hace poco · toca para elegir</span><div class="nv-recent-row">${recent.map((t, i) => `<button class="${isSel(t) ? 'on' : ''}" data-nv-recent="${i}" aria-label="Elegir ${esc(cap(t.preferred_common_name) || t.name)}"><span class="ph" style="background-image:url('${esc(photoUrl(t.default_photo, 'square'))}')">${isSel(t) ? I.check : ''}</span><b>${esc(cap(t.preferred_common_name) || t.name)}</b><i class="sci">${esc(t.name)}</i></button>`).join('')}</div></div>` : ''}
-      <div class="nv-matches">${chosen}<div class="search">${I.search}<label for="cat" class="sr">Buscar en el catálogo oficial</label><input id="cat" type="search" placeholder="Buscar especie: nombre común, científico o alias" value="${esc(n.q)}" autocomplete="off"></div><div id="cat-res"></div></div>`;
+      <div class="nv-matches">${chosen}<div class="search">${I.search}<label for="cat" class="sr">Buscar en el catálogo oficial</label><input id="cat" type="search" placeholder="Buscar especie: ingresa un alias" value="${esc(n.q)}" autocomplete="off"></div><div id="cat-res"></div></div>`;
   const [locT, locS] = nvLocTexts(n);
   const ready = n.lat != null && (later || (r && !n.classifying));
   const why = n.lat == null ? 'Marca en el mapa dónde tomaste la foto.' : !later && !n.sel ? 'Elige la especie o toca «Identificar después».' : '';
   el.innerHTML = `${head}<div class="flow nv">
     <div class="nv-hero" style="background-image:url('${main.preview}')"><button class="nv-gal ${main.savedGal ? 'done' : ''}" data-act="nv-gallery" title="${main.savedGal ? 'Foto guardada en la galería' : 'Guardar en galería'}" aria-label="${main.savedGal ? 'Foto guardada en la galería. Guardar de nuevo' : 'Guardar esta foto en la galería del teléfono'}">${main.savedGal ? I.check : I.dl}</button><button class="nv-edit nv-edit-del" data-nv-del="${n.main}" aria-label="Eliminar esta foto">${I.trash}</button><button class="nv-edit" data-act="nv-replace-photo" aria-label="Cambiar foto principal">${I.edit}</button></div>
     <div class="nv-strip">${n.photos.map((p, i) => `<div class="nv-th"><button class="${i === n.main ? 'on' : ''}" data-nv-main="${i}" aria-label="Foto ${i + 1}" style="background-image:url('${p.preview}')"></button><button class="nv-del" data-nv-del="${i}" aria-label="Eliminar la foto ${i + 1}">${I.x}</button></div>`).join('')}${n.photos.length < 9 ? '<button class="nv-add" data-act="nv-add-photo"><b>+</b><span>Agregar fotos</span></button>' : ''}</div>
-    <div class="nv-row ${n.lat == null ? 'need' : ''}">${I.pin}<span class="info"><b id="nv-loc-t">${esc(locT)}</b><span id="nv-loc-s">${esc(locS)}</span></span><button class="chip-btn" data-act="nv-map-big" id="nv-map-big">${n.mapBig ? 'Reducir' : 'Cambiar'}</button></div>
-    <div id="nv-map-slot"></div>
-    <span class="nv-map-hint">Toca el mapa o arrastra la foto para ajustar la ubicación${n.photos.length > 1 ? '. Cada foto tiene la suya: elige la foto arriba o su número en el mapa.' : '.'}</span>
+    <div class="nv-row ${n.lat == null ? 'need' : ''}">${I.pin}<span class="info"><b id="nv-loc-t">${esc(locT)}</b><span id="nv-loc-s">${esc(locS)}</span></span>${settings.nvMapHide ? '' : `<button class="chip-btn" data-act="nv-map-big" id="nv-map-big">${n.mapBig ? 'Reducir' : 'Cambiar'}</button>`}<button class="chip-btn nv-map-tg" data-act="nv-map-toggle" aria-expanded="${!settings.nvMapHide}">${settings.nvMapHide ? `${I.pin}Mostrar mapa` : 'Ocultar'}</button></div>
+    ${settings.nvMapHide ? '' : `<div id="nv-map-slot"></div>
+    <span class="nv-map-hint">Toca el mapa o arrastra la foto para ajustar la ubicación${n.photos.length > 1 ? '. Cada foto tiene la suya: elige la foto arriba o su número en el mapa.' : '.'}</span>`}
     <div class="nv-row">${I.cal}<span class="info"><b>Fecha y hora</b><span>${esc(fmtWhen(n.when))}</span></span><button class="chip-btn" data-act="nv-edit-when">${n.editWhen ? 'Listo' : 'Editar'}</button></div>
     ${n.editWhen ? `<div class="nv-edit-box"><div class="field"><label for="nv-when">Fecha y hora de la observación</label><input id="nv-when" type="datetime-local" value="${esc(n.when)}"></div></div>` : ''}
-    <b class="nv-sec">Identificar especie</b>
-    <div class="nv-modes"><button class="${!later ? 'on' : ''}" data-act="nv-mode-cat">${I.book}Buscar en catálogo</button><button class="${later ? 'on' : ''}" data-act="nv-mode-later">${I.ai}Identificar después</button></div>
+    <div class="nv-modes"><button class="${!later ? 'on' : ''}" data-act="nv-mode-cat">${I.book}Identificar especie</button><button class="${later ? 'on' : ''}" data-act="nv-mode-later">${I.ai}Identificar después</button></div>
     ${ident}
     ${later ? '' : n.classifying ? '<div class="state" style="padding:8px"><div class="spinner"></div>Comparando con registros de GBIF e iNaturalist…</div>'
       : r ? `<div class="nv-status" style="--sb:${r.bg};--sf:${r.fg}"><i>${I[r.icon]}</i><span><b>${r.tag}</b>${n.result.status === 'validada' ? `Hay ${nf(n.result.near)} registros de esta especie en un radio de ${S.radius} km.` : n.result.status === 'nuevo_local' ? `No hay registros de esta especie en un radio de ${S.radius} km. ¡Podrías ser la primera persona en registrarla en esta zona!` : r.body}</span></div>` : ''}
@@ -1623,6 +1623,26 @@ function renderNuevo() {
   $('#notas').addEventListener('input', (e) => { n.notes = e.target.value; });
   $('#nv-when')?.addEventListener('change', (e) => { if (e.target.value) n.when = e.target.value; });
 }
+// Coordenadas UTM (WGS84) con zona y banda de latitud, p. ej. 19H 346300 E 6299500 N.
+function toUTM(lat, lng) {
+  const a = 6378137, f = 1 / 298.257223563, k0 = 0.9996, e2 = f * (2 - f), ep2 = e2 / (1 - e2), r = Math.PI / 180;
+  const zone = Math.min(60, Math.floor((lng + 180) / 6) + 1), l0 = ((zone - 1) * 6 - 177) * r;
+  const fi = lat * r, sn = Math.sin(fi), cs = Math.cos(fi), tn = Math.tan(fi);
+  const N = a / Math.sqrt(1 - e2 * sn * sn), T = tn * tn, C = ep2 * cs * cs, A = cs * (lng * r - l0);
+  const M = a * ((1 - e2 / 4 - 3 * e2 ** 2 / 64 - 5 * e2 ** 3 / 256) * fi - (3 * e2 / 8 + 3 * e2 ** 2 / 32 + 45 * e2 ** 3 / 1024) * Math.sin(2 * fi)
+    + (15 * e2 ** 2 / 256 + 45 * e2 ** 3 / 1024) * Math.sin(4 * fi) - (35 * e2 ** 3 / 3072) * Math.sin(6 * fi));
+  const E = k0 * N * (A + (1 - T + C) * A ** 3 / 6 + (5 - 18 * T + T * T + 72 * C - 58 * ep2) * A ** 5 / 120) + 500000;
+  const Nn = k0 * (M + N * tn * (A * A / 2 + (5 - T + 9 * C + 4 * C * C) * A ** 4 / 24 + (61 - 58 * T + T * T + 600 * C - 330 * ep2) * A ** 6 / 720)) + (lat < 0 ? 1e7 : 0);
+  const band = 'CDEFGHJKLMNPQRSTUVWX'[Math.min(19, Math.max(0, Math.floor((lat + 80) / 8)))];
+  return { zone, band, E: Math.round(E), N: Math.round(Nn) };
+}
+function updateNvUtm() {
+  const n = S.nuevo, el = nvMapEl?.querySelector('.nv-utm');
+  if (!el || !n) return;
+  const u = n.lat != null ? toUTM(n.lat, n.lng) : null;
+  el.hidden = !u;
+  if (u) el.innerHTML = `<b>UTM ${u.zone}${u.band}</b> ${u.E} E · ${u.N} N`;
+}
 // Mapa del registro: queda en la pantalla (se reubica tras cada redibujo) para no perder zoom ni teselas.
 let nvMap = null, nvMapEl = null, nvLayer = null, nvMe = null;
 function mountNvMap() {
@@ -1631,7 +1651,7 @@ function mountNvMap() {
   if (!nvMapEl) {
     nvMapEl = document.createElement('div');
     nvMapEl.className = 'nv-map';
-    nvMapEl.innerHTML = `<div class="nv-map-in"></div><button class="nv-map-me" data-act="nv-loc-me" aria-label="Usar mi ubicación actual para esta foto">${I.target}</button>`;
+    nvMapEl.innerHTML = `<div class="nv-map-in"></div><div class="nv-utm" hidden title="Coordenadas UTM · WGS84"></div><button class="nv-map-me" data-act="nv-loc-me" aria-label="Usar mi ubicación actual para esta foto">${I.target}</button>`;
     slot.appendChild(nvMapEl);
     nvMap = L.map(nvMapEl.firstChild, { zoomControl: false, attributionControl: false, zoomSnap: 0.25 }).setView([S.pos.lat, S.pos.lng], 16);
     (settings.layer === 'topo' ? L.tileLayer(TILE_URLS.topo, { maxZoom: 19, crossOrigin: true }) : L.layerGroup([L.tileLayer(TILE_URLS.sat, { maxZoom: 19, crossOrigin: true }), L.tileLayer(TILE_URLS.lbl, { maxZoom: 19, opacity: 0.8, crossOrigin: true })])).addTo(nvMap);
@@ -1663,6 +1683,7 @@ function refreshNvMap(center) {
     }
   });
   const p = n.photos[n.main];
+  updateNvUtm();
   if (center) nvMap.setView(hasLoc(p) ? [p.lat, p.lng] : [S.pos.lat, S.pos.lng], Math.max(nvMap.getZoom(), 16), { animate: false });
 }
 function setNvPhotoLoc(lat, lng, src) {
@@ -2980,6 +3001,7 @@ document.addEventListener('click', async (e) => {
     case 'av-photo-del': deleteAvatarPhoto(); break;
     case 'nv-mode-later': S.nuevo.mode = 'later'; renderNuevo(); break;
     case 'nv-mode-cat': S.nuevo.mode = 'cat'; if (S.nuevo.sel && !S.nuevo.result) nuevoClassify(); else renderNuevo(); break;
+    case 'nv-map-toggle': settings.nvMapHide = !settings.nvMapHide; saveSettings(); renderNuevo(); break;
     case 'nv-map-big': { const n = S.nuevo; n.mapBig = !n.mapBig; t.textContent = n.mapBig ? 'Reducir' : 'Cambiar'; nvMapEl?.classList.toggle('big', n.mapBig); setTimeout(() => { nvMap?.invalidateSize(); refreshNvMap(true); }, 220); break; }
     case 'nv-loc-me': currentLoc().then((ll) => { setNvPhotoLoc(ll.lat, ll.lng, 'gps'); refreshNvMap(true); }); break;
     case 'mr-ftoggle': settings.misFOpen = settings.misFOpen === false; saveSettings(); renderMisRegistros(); break;
