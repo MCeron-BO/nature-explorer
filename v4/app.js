@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.13';
+const APP_VERSION = '1.0.14';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -1594,7 +1594,7 @@ function renderNuevo() {
   const recent = n.recent = recentTaxa();
   const chosen = n.sel ? `<div class="muted" style="font-size:12px;font-weight:700">Especie elegida</div><div class="nv-match on">${thumb(photoUrl(n.sel.taxon.default_photo, 'square'), 'sm')}<span class="info"><b class="sci">${esc(n.sel.taxon.name)}</b><span>${esc(cap(n.sel.taxon.preferred_common_name) || n.sel.note || '')}</span></span></div>` : '';
   const ident = later
-    ? `<div class="nv-later">${I.ai}<span><b>Se guardará como «Sin identificar»</b>${settings.token ? 'En Mis Registros la IA de iNaturalist la identifica automáticamente y puedes cambiar la especie si no es correcta.' : 'En Mis Registros la IA la identifica automáticamente cuando agregues tu token de iNaturalist en Ajustes.'}</span></div>`
+    ? `<div class="nv-later">${I.ai}<span><b>Se guardará con el alias en «sin identificar»</b>${settings.token ? 'En Mis Registros la IA de iNaturalist la identifica automáticamente y puedes cambiar la especie si no es correcta.' : 'En Mis Registros la IA la identifica automáticamente cuando agregues tu token de iNaturalist en Ajustes.'}</span></div>`
     : `${recent.length ? `<div class="nv-recent"><span class="nv-recent-k">Registradas hace poco · toca para elegir</span><div class="nv-recent-row">${recent.map((t, i) => `<button class="${isSel(t) ? 'on' : ''}" data-nv-recent="${i}" aria-label="Elegir ${esc(cap(t.preferred_common_name) || t.name)}"><span class="ph" style="background-image:url('${esc(photoUrl(t.default_photo, 'square'))}')">${isSel(t) ? I.check : ''}</span><b>${esc(cap(t.preferred_common_name) || t.name)}</b><i class="sci">${esc(t.name)}</i></button>`).join('')}</div></div>` : ''}
       <div class="nv-matches">${chosen}<div class="search">${I.search}<label for="cat" class="sr">Buscar en el catálogo oficial</label><input id="cat" type="search" placeholder="Buscar especie: ingresa un alias" value="${esc(n.q)}" autocomplete="off"></div><div id="cat-res"></div></div>`;
   const [locT, locS] = nvLocTexts(n);
