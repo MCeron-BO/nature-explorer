@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.15';
+const APP_VERSION = '1.0.16';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -1573,7 +1573,8 @@ function renderNuevo() {
   if (S.nvTab === 'mis') { renderMisRegistros(); return; }
   const n = nuevoState();
   const dirty = !n.saved && n.photos.length > 0;
-  const head = `<header class="head"><div class="title-row"><a href="#mapa" class="icon-btn" aria-label="Volver al mapa">${I.back}</a><div style="flex:1;min-width:0"><h1>Nuevo Registro (Flora)</h1><span class="muted" style="font-size:13px">${dirty ? 'Si vuelves sin guardar, se descarta lo ingresado' : 'Fotografía una planta y ayúdanos a conocer la biodiversidad'}</span></div>${dirty ? `<button class="nv-discard" data-act="nv-discard" aria-label="Descartar registro y empezar de nuevo">${I.trash}<span>Descartar</span></button>` : ''}</div>${nvTabs('nuevo')}</header>`;
+  const head = n.edit ? `<header class="head"><div class="title-row"><a href="${esc(n.back)}" class="icon-btn" aria-label="Volver sin guardar">${I.back}</a><div style="flex:1;min-width:0"><h1>${n.kind === 'nuevo' ? 'Detalle del registro' : 'Detalle de la captura'}</h1><span class="muted" style="font-size:13px">Revisa o corrige los datos. Si vuelves sin guardar, no se aplican los cambios.</span></div><button class="nv-discard" data-act="nv-edit-cancel" aria-label="Cancelar y volver sin guardar">${I.x}<span>Cancelar</span></button></div></header>`
+    : `<header class="head"><div class="title-row"><a href="#mapa" class="icon-btn" aria-label="Volver al mapa">${I.back}</a><div style="flex:1;min-width:0"><h1>Nuevo Registro (Flora)</h1><span class="muted" style="font-size:13px">${dirty ? 'Si vuelves sin guardar, se descarta lo ingresado' : 'Fotografía una planta y ayúdanos a conocer la biodiversidad'}</span></div>${dirty ? `<button class="nv-discard" data-act="nv-discard" aria-label="Descartar registro y empezar de nuevo">${I.trash}<span>Descartar</span></button>` : ''}</div>${nvTabs('nuevo')}</header>`;
   if (n.saved) {
     const later = !n.result;
     el.innerHTML = `${head}<div class="flow center" style="gap:14px"><div class="big-icon">${I.check}</div><h1 style="margin:0;font-size:26px">Observación guardada</h1><p class="muted" style="margin:0;max-width:300px;line-height:1.5">${later ? `Quedó en Mis Registros como «sin identificar». ${settings.token ? 'La IA de iNaturalist la identificará automáticamente.' : 'Agrega tu token de iNaturalist en Ajustes para que la IA la identifique.'}` : `Quedó en Mis Registros como «${esc(RES[n.result.status].tag.toLowerCase())}».`}</p>
@@ -1613,8 +1614,8 @@ function renderNuevo() {
     ${later ? '' : n.classifying ? '<div class="state" style="padding:8px"><div class="spinner"></div>Comparando con registros de GBIF e iNaturalist…</div>'
       : r ? `<div class="nv-status" style="--sb:${r.bg};--sf:${r.fg}"><i>${I[r.icon]}</i><span><b>${r.tag}</b>${n.result.status === 'validada' ? `Hay ${nf(n.result.near)} registros de esta especie en un radio de ${S.radius} km.` : n.result.status === 'nuevo_local' ? `No hay registros de esta especie en un radio de ${S.radius} km. ¡Podrías ser la primera persona en registrarla en esta zona!` : r.body}</span></div>` : ''}
     <div class="field"><label for="notas">Notas de campo</label><textarea id="notas" rows="2" placeholder="Hábitat, número de individuos, fenología…">${esc(n.notes)}</textarea></div>
-    <button class="btn ghost nv-discard-b" data-act="nv-discard">${I.trash}Descartar y empezar de nuevo</button>
-    <div class="nv-savebar">${why ? `<span>${why}</span>` : ''}<button class="btn nv-save" data-act="nv-save" ${ready ? '' : 'disabled'}>${I.check}Guardar observación</button></div></div>`;
+    ${n.edit ? '' : `<button class="btn ghost nv-discard-b" data-act="nv-discard">${I.trash}Descartar y empezar de nuevo</button>`}
+    <div class="nv-savebar">${why ? `<span>${why}</span>` : ''}<button class="btn nv-save" data-act="nv-save" ${ready ? '' : 'disabled'}>${I.check}${n.edit ? 'Guardar cambios' : 'Guardar observación'}</button></div></div>`;
   mountNvMap();
   if (!later) {
     $('#cat').addEventListener('input', (e) => { n.q = e.target.value; clearTimeout(n.qt); n.qt = setTimeout(catalogSearch, 300); });
@@ -1868,12 +1869,56 @@ async function nuevoClassify() {
   const run = (n.crun = (n.crun || 0) + 1);
   n.classifying = true; n.result = null;
   if (route().name === 'nuevo') renderNuevo();
-  try { n.result = await classify(m.taxon, n.lat, n.lng); } catch { toast('No se pudo validar. Revisa tu conexión.'); }
+  try { n.result = await classify(m.taxon, n.lat, n.lng); } catch {
+    if (n.edit && n.orig.taxonId === m.taxon.id && n.orig.status !== 'sin_identificar') n.result = { status: n.orig.status, offline: !!n.orig.pendingSync };
+    else toast('No se pudo validar. Revisa tu conexión.');
+  }
   if (S.nuevo !== n || n.crun !== run) return;
   n.classifying = false;
   if (route().name === 'nuevo') renderNuevo();
 }
+// Abre un registro o captura guardado en la vista de Nuevo Registro, con todas sus opciones, para revisarlo o corregirlo.
+function openRecEdit(uid) {
+  const o = S.collection.find((c) => c.uid === uid);
+  if (!o) return;
+  const loc = o.lat != null ? { lat: o.lat, lng: o.lng } : {};
+  const sel = o.taxonId ? { taxon: { id: o.taxonId, name: o.sci, preferred_common_name: o.common, default_photo: { square_url: o.photo } }, pct: o.conf ?? null, note: 'Especie actual' } : null;
+  S.misSel?.clear();
+  S.nuevo = { edit: uid, orig: o, kind: o.kind, back: location.hash || '#herbario', photos: [{ preview: o.userPhoto || o.photo || '', orig: true, ...loc }], main: 0,
+    mode: o.taxonId ? 'cat' : 'later', sel, result: null, q: '', catalog: [], notes: o.notes || '', place: o.place || '', uid: o.uid,
+    when: o.when || `${o.date || today()}T12:00`, lat: o.lat ?? null, lng: o.lng ?? null };
+  S.nvTab = 'nuevo';
+  location.hash = '#nuevo';
+  if (!S.nuevo.place) nuevoPlace();
+  if (sel) nuevoClassify();
+}
+function nuevoSaveEdit() {
+  const n = S.nuevo, o = S.collection.find((c) => c.uid === n.edit);
+  if (!o) { toast('Este registro ya no existe.'); S.nuevo = null; location.hash = n.back; return; }
+  const later = n.mode === 'later' || !n.sel || !n.result, mp = n.photos[n.main];
+  const wasId = !!o.taxonId && o.status !== 'sin_identificar';
+  // Con la misma foto se conservan las ubicaciones de las demás fotos del registro.
+  const same = n.photos.length === 1 && mp.orig;
+  const upd = { ...o, userPhoto: mp.orig ? o.userPhoto : mp.preview, notes: n.notes, date: n.when.slice(0, 10), when: n.when, lat: n.lat, lng: n.lng, place: n.place || '' };
+  if (!same) Object.assign(upd, { photos: n.photos.length, photoLocs: n.photos.map((q) => (hasLoc(q) ? [q.lat, q.lng] : null)) });
+  else if (o.photoLocs?.length) upd.photoLocs = o.photoLocs.map((q) => (q && o.lat != null && q[0] === o.lat && q[1] === o.lng ? [n.lat, n.lng] : q));
+  if (later) {
+    Object.assign(upd, { id: '', taxonId: null, sci: '', common: '', photo: '', status: 'sin_identificar', conf: null, idBy: null });
+    delete upd.aiSug; delete upd.aiFail;
+  } else {
+    const t = n.sel.taxon, changed = t.id !== o.taxonId;
+    Object.assign(upd, { id: String(t.id), taxonId: t.id, sci: t.name, common: cap(t.preferred_common_name), photo: photoUrl(t.default_photo, 'square') || o.photo, status: n.result.status, pendingSync: !!n.result.offline });
+    if (changed) Object.assign(upd, { conf: n.sel.pct ?? null, idBy: 'catalogo' });
+  }
+  addToCollection(upd);
+  if (!wasId && !later) addXP(STATUS_XP[upd.status] || 0, 'registro identificado');
+  S.nuevo = null;
+  location.hash = n.back;
+  sfx('pop');
+  toast(n.kind === 'nuevo' ? 'Cambios del registro guardados' : 'Cambios de la captura guardados');
+}
 function nuevoSave() {
+  if (S.nuevo?.edit) { nuevoSaveEdit(); return; }
   const n = S.nuevo, later = n.mode === 'later' || !n.sel || !n.result;
   const base = { uid: n.uid, userPhoto: n.photos[n.main].preview, photos: n.photos.length, photoLocs: n.photos.map((p) => (hasLoc(p) ? [p.lat, p.lng] : null)), notes: n.notes, date: n.when.slice(0, 10), when: n.when, lat: n.lat, lng: n.lng, place: n.place || '', kind: 'nuevo' };
   if (later) {
@@ -1937,10 +1982,10 @@ const refreshMis = () => {
 };
 const recSt = (o) => aiNow.has(o.uid) ? '<span class="mr-st ai"><i class="spin-s"></i>IA…</span>'
   : o.taxonId ? `<span class="mr-st ok" title="Identificada">${I.check}${o.idBy === 'ia' && o.conf != null ? `IA ${o.conf}%` : 'Identificada'}</span>` : '<span class="mr-st no">Sin identificar</span>';
-const recRow = (o, sel) => `<div class="mr-row ${sel.has(o.uid) ? 'on' : ''}"><label class="mr-ck"><input type="checkbox" data-mr-ck="${esc(o.uid)}" ${sel.has(o.uid) ? 'checked' : ''} aria-label="Seleccionar ${esc(recName(o))}"></label>
+const recRow = (o, sel, open) => `<div class="mr-row ${sel.has(o.uid) ? 'on' : ''}"><label class="mr-ck"><input type="checkbox" data-mr-ck="${esc(o.uid)}" ${sel.has(o.uid) ? 'checked' : ''} aria-label="Seleccionar ${esc(recName(o))}"></label>
     <span class="mr-ph" style="background-image:url('${esc(o.userPhoto || o.photo)}')"></span>
     <div class="info"><div class="l1"><b>${esc(recName(o))}</b>${o.taxonId || aiNow.has(o.uid) || recName(o) !== 'Sin identificar' ? recSt(o) : ''}</div>${o.taxonId && o.common ? `<i class="sci">${esc(o.sci)}</i>` : ''}<span class="l3">${I.cal}${esc(recDate(o))}<em>·</em>${I.pin}<span>${esc(o.place || (o.lat != null ? `${o.lat.toFixed(4)}, ${o.lng.toFixed(4)}` : 'Sin ubicación'))}</span></span></div>
-    <button class="mr-more" data-mr-more="${esc(o.uid)}" aria-label="Opciones de ${esc(recName(o))}">⋮</button></div>`;
+    <button class="mr-more" data-mr-more="${esc(o.uid)}" aria-label="Opciones de ${esc(recName(o))}">⋮</button>${open ? `<button class="mr-open" data-mr-open="${esc(o.uid)}" aria-label="Ver el detalle de ${esc(recName(o))}" title="Ver detalle">${I.right}</button>` : ''}</div>`;
 const recBar = (nSel) => `<div class="mr-bar"><button data-act="mr-del" ${nSel ? '' : 'disabled'}>${I.trash}<span>Eliminar<small>(${nSel} seleccionado${nSel === 1 ? '' : 's'})</small></span></button><i></i><button data-act="mr-exp" ${nSel ? '' : 'disabled'}>${I.dl}<span>Exportar<small>(${nSel} seleccionado${nSel === 1 ? '' : 's'})</small></span></button></div>`;
 function renderMisRegistros() {
   const el = $('#s-nuevo');
@@ -2247,7 +2292,7 @@ function renderHerbSpecies(famName, genName, e) {
     <div class="hb-body hb-recs">
       <div class="hb-rec-top"><span>${herbRanged() ? `Registros ${esc(rangeText())}` : 'Todos tus registros de esta especie'}</span><a class="dl-mini" href="#ficha/${e.id}">${I.book}<span>Ver ficha</span></a></div>
       <div class="nv-tabs" role="tablist">${tabBtn('reg', 'Mis registros', reg.length)}${tabBtn('cap', 'Mis capturas', capt.length)}</div>
-      <div class="flow mr">${rows.length ? `<div class="mr-tools"><label class="mr-ck"><input type="checkbox" data-mr-all="1" ${rows.length && sel.size === rows.length ? 'checked' : ''} aria-label="Seleccionar todos"></label><span>${nf(rows.length)} ${tab === 'reg' ? `registro${rows.length === 1 ? '' : 's'}` : `captura${rows.length === 1 ? '' : 's'}`} · más recientes primero</span></div>${rows.map((o) => recRow(o, sel)).join('')}`
+      <div class="flow mr">${rows.length ? `<div class="mr-tools"><label class="mr-ck"><input type="checkbox" data-mr-all="1" ${rows.length && sel.size === rows.length ? 'checked' : ''} aria-label="Seleccionar todos"></label><span>${nf(rows.length)} ${tab === 'reg' ? `registro${rows.length === 1 ? '' : 's'}` : `captura${rows.length === 1 ? '' : 's'}`} · más recientes primero</span></div>${rows.map((o) => recRow(o, sel, true)).join('')}`
         : `<div class="state">${tab === 'reg' ? 'No tienes nuevos registros de esta especie.' : 'No has capturado esta especie en el mapa.'}</div>`}
       ${recBar(sel.size)}</div></div>`;
   el.scrollTop = 0;
@@ -2872,7 +2917,7 @@ function show() {
   if (name !== 'mapa') hideMapSearch();
   // Salir de Nuevo registro sin guardar descarta lo ingresado.
   if (name !== 'nuevo' && S.nuevo) {
-    if (!S.nuevo.saved && S.nuevo.photos.length) toast('Registro descartado: no se guardó.');
+    if (!S.nuevo.saved && !S.nuevo.edit && S.nuevo.photos.length) toast('Registro descartado: no se guardó.');
     S.nuevo = null;
   }
   if (name === 'nuevo' && S.lastRoute !== 'nuevo') S.nvTab = 'nuevo';
@@ -2922,6 +2967,7 @@ document.addEventListener('click', async (e) => {
   if (d.mrf) { S.misF = d.mrf; renderMisRegistros(); return; }
   if (d.hbtab) { S.hbTab = d.hbtab; S.misSel?.clear(); renderHerbario(route().arg); return; }
   if (d.mrMore) { openRecMenu(d.mrMore); return; }
+  if (d.mrOpen) { openRecEdit(d.mrOpen); return; }
   if (d.mrAct) {
     const [a, uid] = d.mrAct.split(/:(.*)/s), o = S.collection.find((c) => c.uid === uid);
     if (!o) return;
@@ -3044,6 +3090,7 @@ document.addEventListener('click', async (e) => {
     case 'nv-add-photo': openPhotoSource('add'); break;
     case 'nv-replace-photo': openPhotoSource('replace'); break;
     case 'nv-save': nuevoSave(); break;
+    case 'nv-edit-cancel': { const b = S.nuevo?.back || '#herbario'; S.nuevo = null; location.hash = b; break; }
     case 'nv-reset': S.nuevo = null; renderNuevo(); break;
     case 'nv-discard': nuevoDiscard(true); break;
     case 'nv-discard-ok': nuevoDiscard(false); break;
