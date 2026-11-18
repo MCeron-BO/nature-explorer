@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.16';
+const APP_VERSION = '1.0.17';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -2337,7 +2337,7 @@ function renderHerbario(arg) {
     <div class="hb-body"><div class="hb-card"><div class="hb-card-h"><span class="hb-sp-ic">${I.leaf}</span><div style="flex:1;min-width:0"><b>Especies (${sp.length})</b><p>Listado de especies del género ${esc(genName)} que has registrado.</p></div><button class="hb-info" data-act="hb-search" aria-label="Buscar en este género">${I.search}</button></div>
       ${S.hbSearch ? `<div class="search">${I.search}<label for="hb-q" class="sr">Buscar especie en el género</label><input id="hb-q" type="search" placeholder="Nombre, científico o alias" value="${esc(S.hbQ || '')}" autocomplete="off"></div>` : ''}</div>
     ${herbChips(sort)}
-    <div class="hb-list">${shown.map((e) => `<a class="hb-sp" href="#herbario/${encodeURIComponent(`${famName}~${genName}~${e.id}`)}" aria-label="Ver tus registros y capturas de ${esc(e.common || e.sci)}"><span class="ph" style="background-image:url('${esc(e.user || e.photo)}')"></span><span class="nm"><b>${esc(e.common || e.sci)}</b>${e.common ? `<i>${esc(e.sci)}</i>` : ''}</span><span class="meta">${e.nReg ? `<span>${I.book}${nf(e.nReg)} registro${e.nReg === 1 ? '' : 's'}</span>` : ''}${e.nCap ? `<span>${I.cam}${nf(e.nCap)} captura${e.nCap === 1 ? '' : 's'}</span>` : ''}<span>${I.cal}${esc(herbDate(e.last))}</span></span>${I.right}</a>`).join('') || '<div class="state">Sin coincidencias.</div>'}</div></div>`;
+    <div class="hb-list">${shown.map((e) => `<a class="hb-sp" href="#herbario/${encodeURIComponent(`${famName}~${genName}~${e.id}`)}" aria-label="Ver tus registros y capturas de ${esc(e.common || e.sci)}"><span class="ph" style="background-image:url('${esc(e.user || e.photo)}')"></span><span class="nm"><b>${esc(e.common || e.sci)}</b>${e.common ? `<i>${esc(e.sci)}</i>` : ''}</span><span class="meta">${e.nReg ? `<span>${I.book}${nf(e.nReg)} registro${e.nReg === 1 ? '' : 's'}</span>` : ''}${e.nCap ? `<span>${I.cam}${nf(e.nCap)} captura${e.nCap === 1 ? '' : 's'}</span>` : ''}</span>${I.right}</a>`).join('') || '<div class="state">Sin coincidencias.</div>'}</div></div>`;
   bindHerbRange(arg);
   const inp = $('#hb-q');
   if (inp) { inp.addEventListener('input', () => { S.hbQ = inp.value; const pos = inp.selectionStart; renderHerbario(arg); const n = $('#hb-q'); n.focus(); n.setSelectionRange(pos, pos); }); }
