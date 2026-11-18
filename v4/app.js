@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.18';
+const APP_VERSION = '1.0.19';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -2664,7 +2664,7 @@ window.addEventListener('offline', () => {
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 /* ---------- barra inferior configurable ---------- */
-const TAB_NAMES = { mapa: 'Mapa', especies: 'Especies', nuevo: 'Registrar', herbario: 'Mi Herbario', coleccion: 'Colección' };
+const TAB_NAMES = { mapa: 'Mapa', especies: 'Especies', nuevo: 'Registrar', herbario: 'Mi Herbario' };
 function applyTabs() {
   let n = 0;
   document.querySelectorAll('#tabbar [data-tab]').forEach((el) => {
