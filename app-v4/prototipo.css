@@ -776,11 +776,7 @@ body.is-offline .map-title span:not(.logo-leaf){color:#B23A2E;font-weight:800}
 .rf-name .sci{font-size:19px;color:var(--ink2)}
 .rf-tax{font-size:14px}
 .rf-tax:empty{display:none}
-.rf-sp-btn{display:inline-flex;align-items:center;gap:5px;padding:0 12px}
-.rf-sp-btn svg{width:15px;height:15px}
-.rf-id{display:flex;flex-direction:column;gap:10px}
 .rf-notes-h{display:flex;align-items:center;justify-content:space-between}
-.rf-link{border:none;background:none;color:var(--g900);font-weight:700;font-size:14px;padding:4px 2px}
 .rf-up .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;font-size:14px;padding-left:8px;padding-right:8px}
 .rf-up .btn svg{width:15px;height:15px}
 .rf-up .btn.done{background:var(--g100)}
@@ -790,3 +786,7 @@ body.is-offline .map-title span:not(.logo-leaf){color:#B23A2E;font-weight:800}
 .rf-sum-i b{font-size:12px;color:var(--ink2);text-transform:uppercase;letter-spacing:.03em}
 .rf-sum-i .ok{color:var(--g900);font-weight:700}
 .rf-sum-i .no{color:#b42318;font-weight:600}
+/* Ficha del registro: notas bloqueadas hasta «Editar» y un solo botón de subida */
+.rf textarea.locked{background:var(--g50,#f4f7f5);color:var(--ink2);cursor:default}
+.rf-up{display:flex}
+.rf-up .btn{flex:1}
