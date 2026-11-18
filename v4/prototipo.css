@@ -768,3 +768,25 @@ body.is-offline .map-title span:not(.logo-leaf){color:#B23A2E;font-weight:800}
 .hb-days{display:flex;gap:6px;overflow-x:auto}
 .hb-days button{height:28px;padding:0 10px;border-radius:999px;border:1px solid var(--line);background:#fff;font-size:12px;white-space:nowrap}
 .hb-days button.on{background:var(--g100);border-color:var(--g900);color:var(--g900);font-weight:700}
+
+/* Ficha de un registro guardado (detalle desde Mi Herbario) */
+.rf-chip{flex-shrink:0;padding:6px 12px;border-radius:999px;background:var(--g900);color:#fff;font-size:13px;font-weight:700}
+.rf-name{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.rf-name h1{margin:2px 0 0;font-size:28px;line-height:1.15}
+.rf-name .sci{font-size:19px;color:var(--ink2)}
+.rf-tax{font-size:14px}
+.rf-tax:empty{display:none}
+.rf-sp-btn{display:inline-flex;align-items:center;gap:5px;padding:0 12px}
+.rf-sp-btn svg{width:15px;height:15px}
+.rf-id{display:flex;flex-direction:column;gap:10px}
+.rf-notes-h{display:flex;align-items:center;justify-content:space-between}
+.rf-link{border:none;background:none;color:var(--g900);font-weight:700;font-size:14px;padding:4px 2px}
+.rf-up .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;font-size:14px;padding-left:8px;padding-right:8px}
+.rf-up .btn svg{width:15px;height:15px}
+.rf-up .btn.done{background:var(--g100)}
+.rf-up-note{font-size:12px;margin-top:-6px}
+.rf-sum{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border:1px solid var(--line);border-radius:12px}
+.rf-sum-i{display:flex;flex-direction:column;gap:1px;font-size:14px}
+.rf-sum-i b{font-size:12px;color:var(--ink2);text-transform:uppercase;letter-spacing:.03em}
+.rf-sum-i .ok{color:var(--g900);font-weight:700}
+.rf-sum-i .no{color:#b42318;font-weight:600}

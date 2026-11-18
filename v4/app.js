@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.20';
+const APP_VERSION = '1.0.21';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -1572,7 +1572,7 @@ function renderNuevo() {
   if (S.nvTab === 'mis') { renderMisRegistros(); return; }
   const n = nuevoState();
   const dirty = !n.saved && n.photos.length > 0;
-  const head = n.edit ? `<header class="head"><div class="title-row"><a href="${esc(n.back)}" class="icon-btn" aria-label="Volver sin guardar">${I.back}</a><div style="flex:1;min-width:0"><h1>${n.kind === 'nuevo' ? 'Detalle del registro' : 'Detalle de la captura'}</h1><span class="muted" style="font-size:13px">Revisa o corrige los datos. Si vuelves sin guardar, no se aplican los cambios.</span></div><button class="nv-discard" data-act="nv-edit-cancel" aria-label="Cancelar y volver sin guardar">${I.x}<span>Cancelar</span></button></div></header>`
+  const head = n.edit ? `<header class="head"><div class="title-row"><a href="${esc(n.back)}" class="icon-btn" aria-label="Volver sin guardar">${I.back}</a><div style="flex:1;min-width:0"><h1>${n.kind === 'nuevo' ? 'Detalle del registro' : 'Detalle de la captura'}</h1><span class="muted" style="font-size:13px">Si vuelves sin guardar, no se aplican los cambios.</span></div><span class="rf-chip">En tu colección</span></div></header>`
     : `<header class="head"><div class="title-row"><a href="#mapa" class="icon-btn" aria-label="Volver al mapa">${I.back}</a><div style="flex:1;min-width:0"><h1>Nuevo Registro (Flora)</h1><span class="muted" style="font-size:13px">${dirty ? 'Si vuelves sin guardar, se descarta lo ingresado' : 'Fotografía una planta y ayúdanos a conocer la biodiversidad'}</span></div>${dirty ? `<button class="nv-discard" data-act="nv-discard" aria-label="Descartar registro y empezar de nuevo">${I.trash}<span>Descartar</span></button>` : ''}</div>${nvTabs('nuevo')}</header>`;
   if (n.saved) {
     const later = !n.result;
@@ -1600,6 +1600,7 @@ function renderNuevo() {
   const [locT, locS] = nvLocTexts(n);
   const ready = n.lat != null && (later || (r && !n.classifying));
   const why = n.lat == null ? 'Marca en el mapa dónde tomaste la foto.' : !later && !n.sel ? 'Elige la especie o toca «Identificar después».' : '';
+  if (n.edit) { renderRecFicha(el, n, { head, main, later, r, ident, ready, why }); return; }
   el.innerHTML = `${head}<div class="flow nv">
     <div class="nv-hero" style="background-image:url('${main.preview}')"><button class="nv-gal ${main.savedGal ? 'done' : ''}" data-act="nv-gallery" title="${main.savedGal ? 'Foto guardada en la galería' : 'Guardar en galería'}" aria-label="${main.savedGal ? 'Foto guardada en la galería. Guardar de nuevo' : 'Guardar esta foto en la galería del teléfono'}">${main.savedGal ? I.check : I.dl}</button><button class="nv-edit nv-edit-del" data-nv-del="${n.main}" aria-label="Eliminar esta foto">${I.trash}</button><button class="nv-edit" data-act="nv-replace-photo" aria-label="Cambiar foto principal">${I.edit}</button></div>
     <div class="nv-strip">${n.photos.map((p, i) => `<div class="nv-th"><button class="${i === n.main ? 'on' : ''}" data-nv-main="${i}" aria-label="Foto ${i + 1}" style="background-image:url('${p.preview}')"></button><button class="nv-del" data-nv-del="${i}" aria-label="Eliminar la foto ${i + 1}">${I.x}</button></div>`).join('')}${n.photos.length < 9 ? '<button class="nv-add" data-act="nv-add-photo"><b>+</b><span>Agregar fotos</span></button>' : ''}</div>
@@ -1622,6 +1623,146 @@ function renderNuevo() {
   }
   $('#notas').addEventListener('input', (e) => { n.notes = e.target.value; });
   $('#nv-when')?.addEventListener('change', (e) => { if (e.target.value) n.when = e.target.value; });
+}
+/* ---------- ficha de un registro guardado ---------- */
+// Especie del registro en el formato que usan los alias.
+const nvAliasSp = (n) => (n?.sel && n.mode !== 'later' ? { inatId: n.sel.taxon.id, id: String(n.sel.taxon.id), sci: n.sel.taxon.name, common: cap(n.sel.taxon.preferred_common_name), photo: photoUrl(n.sel.taxon.default_photo, 'square') } : null);
+function rfAliasHtml(n) {
+  const sp = nvAliasSp(n);
+  return sp ? aliasRowHtml(sp) : '<span class="muted" style="font-size:13px">Identifica la especie para agregarle un alias.</span>';
+}
+// Familia y orden de la especie (desde iNaturalist; se guardan para no volver a pedirlos).
+async function rfTaxonomy(n) {
+  const id = n.sel?.taxon.id;
+  if (!id || n.mode === 'later' || n.tax?.id === id) return;
+  n.tax = { id, fam: '', ord: '' };
+  try {
+    const t = (await getJSON(`${INAT}/taxa/${id}?locale=es`)).results[0];
+    const anc = t?.ancestors || [];
+    Object.assign(n.tax, { fam: anc.find((a) => a.rank === 'family')?.name || '', ord: anc.find((a) => a.rank === 'order')?.name || '' });
+  } catch { /* sin conexión: queda sin familia */ }
+  const box = $('#rf-tax');
+  if (box && S.nuevo === n && n.tax.id === n.sel?.taxon.id) box.textContent = rfTaxText(n);
+}
+const rfTaxText = (n) => (n.tax?.fam ? `Familia ${n.tax.fam}${n.tax.ord ? ` · Orden ${n.tax.ord}` : ''}` : '');
+function renderRecFicha(el, n, { head, main, later, r, ident, ready, why }) {
+  const o = S.collection.find((c) => c.uid === n.edit) || n.orig;
+  const t = !later && n.sel ? n.sel.taxon : null;
+  const mapOn = !!n.mapOpen;
+  const [locT, locS] = nvLocTexts(n);
+  const up = n.uploading;
+  el.innerHTML = `${head}<div class="flow nv rf">
+    <div class="nv-hero" style="background-image:url('${main.preview}')"><button class="nv-gal ${main.savedGal ? 'done' : ''}" data-act="nv-gallery" title="${main.savedGal ? 'Foto guardada en la galería' : 'Guardar en galería'}" aria-label="${main.savedGal ? 'Foto guardada en la galería. Guardar de nuevo' : 'Guardar esta foto en la galería del teléfono'}">${main.savedGal ? I.check : I.dl}</button><button class="nv-edit nv-edit-del" data-nv-del="${n.main}" aria-label="Eliminar esta foto">${I.trash}</button><button class="nv-edit" data-act="nv-replace-photo" aria-label="Cambiar foto principal">${I.edit}</button></div>
+    <div class="nv-strip">${n.photos.map((p, i) => `<div class="nv-th"><button class="${i === n.main ? 'on' : ''}" data-nv-main="${i}" aria-label="Foto ${i + 1}" style="background-image:url('${p.preview}')"></button><button class="nv-del" data-nv-del="${i}" aria-label="Eliminar la foto ${i + 1}">${I.x}</button></div>`).join('')}${n.photos.length < 9 ? '<button class="nv-add" data-act="nv-add-photo"><b>+</b><span>Agregar fotos</span></button>' : ''}</div>
+    <div class="rf-name">
+      <h1>${esc(t ? cap(t.preferred_common_name) || t.name : 'Sin identificar')}</h1>
+      ${t ? `<div class="sci">${esc(t.name)}</div>` : ''}
+      <div class="al-row" id="rf-al-row">${rfAliasHtml(n)}</div>
+      ${t ? `<div class="muted rf-tax" id="rf-tax">${esc(rfTaxText(n))}</div>` : ''}
+      <button class="chip-btn rf-sp-btn" data-act="rf-id-toggle" aria-expanded="${!!n.idOpen}">${n.idOpen ? 'Listo' : t ? `${I.edit}Cambiar especie` : `${I.book}Identificar especie`}</button>
+    </div>
+    ${n.idOpen ? `<div class="rf-id"><div class="nv-modes"><button class="${!later ? 'on' : ''}" data-act="nv-mode-cat">${I.book}Identificar especie</button><button class="${later ? 'on' : ''}" data-act="nv-mode-later">${I.ai}Identificar después</button></div>
+    ${ident}</div>` : ''}
+    ${later ? '' : n.classifying ? '<div class="state" style="padding:8px"><div class="spinner"></div>Comparando con registros de GBIF e iNaturalist…</div>'
+      : r ? `<div class="nv-status" style="--sb:${r.bg};--sf:${r.fg}"><i>${I[r.icon]}</i><span><b>${r.tag}</b>${n.result.status === 'validada' ? `Hay ${nf(n.result.near)} registros de esta especie en un radio de ${S.radius} km.` : n.result.status === 'nuevo_local' ? `No hay registros de esta especie en un radio de ${S.radius} km.` : r.body}</span></div>` : ''}
+    <div class="nv-row ${n.lat == null ? 'need' : ''}">${I.pin}<span class="info"><b id="nv-loc-t">${esc(locT)}</b><span id="nv-loc-s">${esc(locS)}</span></span>${mapOn ? `<button class="chip-btn" data-act="nv-map-big" id="nv-map-big">${n.mapBig ? 'Reducir' : 'Cambiar'}</button><button class="chip-btn nv-map-tg" data-act="nv-map-toggle" aria-expanded="true">Ocultar</button>` : `<button class="chip-btn nv-map-tg" data-act="nv-map-toggle" aria-expanded="false">${I.pin}Mostrar mapa</button>`}</div>
+    ${mapOn ? `<div id="nv-map-slot"></div><span class="nv-map-hint">Toca «Cambiar» para agrandar el mapa; toca el mapa o arrastra la foto para ajustar la ubicación.</span>` : ''}
+    <div class="nv-row">${I.cal}<span class="info"><b>Fecha y hora</b><span>${esc(fmtWhen(n.when))}</span></span><button class="chip-btn" data-act="nv-edit-when">${n.editWhen ? 'Listo' : 'Editar'}</button></div>
+    ${n.editWhen ? `<div class="nv-edit-box"><div class="field"><label for="nv-when">Fecha y hora de la observación</label><input id="nv-when" type="datetime-local" value="${esc(n.when)}"></div></div>` : ''}
+    <div class="field"><div class="rf-notes-h"><label for="notas">Notas de campo</label><button class="rf-link" data-act="rf-notes">Editar</button></div><textarea id="notas" rows="2" placeholder="Hábitat, número de individuos, fenología…">${esc(n.notes)}</textarea></div>
+    <div class="two rf-up"><button class="btn outline" data-act="rf-gbif">Subir a GBIF${I.ext}</button>${o?.inatObs ? `<a class="btn outline done" href="https://www.inaturalist.org/observations/${encodeURIComponent(o.inatObs)}" target="_blank" rel="noopener">${I.check}En iNaturalist${I.ext}</a>` : `<button class="btn outline" data-act="rf-inat" ${up ? 'disabled' : ''}>${up ? '<i class="spin-s"></i>Subiendo…' : `Subir a iNaturalist${I.ext}`}</button>`}</div>
+    ${o?.inatObs ? `<span class="muted rf-up-note">Subido a iNaturalist el ${esc(recDate({ when: o.inatAt }))} · observación n.º ${esc(o.inatObs)}</span>` : ''}
+    <div class="nv-savebar">${why ? `<span>${why}</span>` : ''}<button class="btn nv-save" data-act="nv-save" ${ready ? '' : 'disabled'}>${I.check}Guardar observación</button></div></div>`;
+  mountNvMap();
+  if (n.idOpen && !later) {
+    $('#cat').addEventListener('input', (e) => { n.q = e.target.value; clearTimeout(n.qt); n.qt = setTimeout(catalogSearch, 300); });
+    if (n.q) catalogSearch();
+  }
+  $('#notas').addEventListener('input', (e) => { n.notes = e.target.value; });
+  $('#nv-when')?.addEventListener('change', (e) => { if (e.target.value) n.when = e.target.value; });
+  rfTaxonomy(n);
+}
+// Lista para guardar: con ubicación y, si tiene especie, ya validada.
+const nvReady = (n) => n.lat != null && (n.mode === 'later' || (!!n.sel && !!n.result && !n.classifying));
+// Subir a iNaturalist: se confirma lo que se enviará; antes de subir se guardan los cambios de la ficha.
+function rfInatAsk() {
+  const n = S.nuevo;
+  if (!n?.edit) return;
+  if (!settings.token) { closeModal(); toast('Para subir agrega tu token de iNaturalist en Ajustes.'); openSettings(); return; }
+  if (!navigator.onLine) { toast('Sin conexión: conéctate para subir a iNaturalist.'); return; }
+  if (n.lat == null) { closeModal(); toast('Marca la ubicación antes de subir.'); return; }
+  if (!nvReady(n)) { closeModal(); toast(n.classifying ? 'Espera a que termine la validación.' : 'Elige la especie o deja «Identificar después» antes de subir.'); return; }
+  const later = n.mode === 'later', t = later ? null : n.sel.taxon, p = n.photos[n.main];
+  const own = !!(p?.file || (p?.orig ? n.orig.userPhoto : p?.preview));
+  const li = (k, v) => `<div class="rf-sum-i"><b>${k}</b><span>${v}</span></div>`;
+  openModal(`<div class="top"><h2>Subir a iNaturalist</h2><button class="x" data-act="modal-close" aria-label="Cerrar">${I.x}</button></div>
+    <div class="rf-sum">${li('Especie', t ? `${esc(cap(t.preferred_common_name) || t.name)} · <i>${esc(t.name)}</i>` : 'Sin identificar: la comunidad te ayudará a identificarla')}
+    ${li('Fecha y hora', esc(fmtWhen(n.when)))}${li('Ubicación', `${esc(n.place || 'Sin nombre de lugar')}<br><small>${n.lat.toFixed(5)}, ${n.lng.toFixed(5)}</small>`)}
+    ${li('Foto', own ? 'Tu foto principal' : '<span class="no">Sin foto propia: se sube sin foto y quedará como «casual»</span>')}${li('Notas', esc(n.notes || '—'))}</div>
+    <p class="muted" style="margin:0;font-size:13px;line-height:1.45">Se publica en tu cuenta de iNaturalist con la licencia que tengas configurada allí (por defecto CC-BY-NC). Antes de subir se guardan los cambios de esta ficha.</p>
+    <div class="two"><button class="btn light" data-act="modal-close">Cancelar</button><button class="btn" data-act="rf-inat-go">${I.up}Subir</button></div>`);
+}
+async function rfInatUpload() {
+  closeModal();
+  const n = S.nuevo;
+  if (!n?.edit || n.uploading) return;
+  if (!nvReady(n)) { toast('Completa la ficha antes de subir.'); return; }
+  const p = n.photos[n.main];
+  let blob = null;
+  try { blob = p.file || (p.orig ? (n.orig.userPhoto ? await (await fetch(n.orig.userPhoto)).blob() : null) : await (await fetch(p.preview)).blob()); } catch { blob = null; }
+  nuevoSaveEdit(true);
+  const o = S.collection.find((c) => c.uid === n.edit);
+  if (!o) return;
+  n.uploading = true; renderNuevo();
+  const auth = { Authorization: settings.token, Accept: 'application/json' };
+  try {
+    const obs = { observed_on_string: (o.when || `${o.date}T12:00`).replace('T', ' '), latitude: o.lat, longitude: o.lng, description: o.notes || '', place_guess: o.place || '' };
+    if (o.taxonId) Object.assign(obs, { taxon_id: o.taxonId, species_guess: o.sci });
+    const r = await fetch(`${INAT}/observations`, { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify({ observation: obs }) });
+    if (r.status === 401) throw new Error('token');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const j = await r.json(), id = j.id ?? j.results?.[0]?.id ?? j[0]?.id;
+    if (!id) throw new Error('sin id');
+    let photoOk = !blob;
+    if (blob) {
+      const fd = new FormData();
+      fd.append('observation_photo[observation_id]', id);
+      fd.append('file', blob, `${o.uid}.jpg`);
+      try { photoOk = (await fetch(`${INAT}/observation_photos`, { method: 'POST', headers: auth, body: fd })).ok; } catch { photoOk = false; }
+    }
+    const cur = S.collection.find((c) => c.uid === o.uid) || o;
+    const upd = { ...cur, inatObs: id, inatAt: new Date().toISOString() };
+    addToCollection(upd);
+    if (S.nuevo === n) n.orig = upd;
+    sfx('pop');
+    toast(photoOk ? '¡Subido a iNaturalist!' : 'Subido a iNaturalist, pero la foto no se pudo enviar: agrégala desde iNaturalist.');
+  } catch (e) {
+    toast(e.message === 'token' ? 'Tu token de iNaturalist venció: genera uno nuevo en Ajustes.' : 'No se pudo subir a iNaturalist. Inténtalo de nuevo.');
+  }
+  if (S.nuevo === n) { n.uploading = false; if (route().name === 'nuevo') renderNuevo(); }
+}
+// GBIF no recibe registros sueltos: los toma de iNaturalist (grado de investigación y licencia abierta).
+async function rfGbif() {
+  const n = S.nuevo, o = n && S.collection.find((c) => c.uid === n.edit);
+  if (!o) return;
+  const how = '<p class="muted" style="margin:0;font-size:13px;line-height:1.5">GBIF no recibe registros sueltos de personas: los recibe de iNaturalist. Tu observación pasa a GBIF sola, normalmente en una semana, cuando llega a <b>grado de investigación</b> (otra persona confirma la especie) y tiene una <b>licencia abierta</b> (CC0, CC-BY o CC-BY-NC).</p>';
+  if (!o.inatObs) {
+    openModal(`<div class="top"><h2>Subir a GBIF</h2><button class="x" data-act="modal-close" aria-label="Cerrar">${I.x}</button></div>${how}
+      <div class="two"><button class="btn light" data-act="modal-close">Cerrar</button><button class="btn" data-act="rf-inat">Subir a iNaturalist</button></div>`);
+    return;
+  }
+  openModal(`<div class="top"><h2>Subir a GBIF</h2><button class="x" data-act="modal-close" aria-label="Cerrar">${I.x}</button></div>${how}<div id="rf-gbif-st" class="state" style="padding:8px"><div class="spinner"></div>Revisando tu observación en iNaturalist…</div>`);
+  let html;
+  try {
+    const ob = (await getJSON(`${INAT}/observations/${encodeURIComponent(o.inatObs)}`, {})).results[0];
+    const q = ob.quality_grade, lic = ob.license_code;
+    const QL = { research: ['✓ Grado de investigación', 'ok'], needs_id: ['Necesita identificación: espera que otra persona confirme la especie', ''], casual: ['Casual: le falta foto, fecha o ubicación, o no es silvestre. No pasa a GBIF', 'no'] };
+    const [ql, qc] = QL[q] || [q, ''];
+    html = `<div class="rf-sum"><div class="rf-sum-i"><b>Calidad</b><span class="${qc}">${esc(ql)}</span></div><div class="rf-sum-i"><b>Licencia</b><span class="${lic ? 'ok' : 'no'}">${lic ? esc(lic.toUpperCase()) : 'Todos los derechos reservados: no pasa a GBIF. Cámbiala en iNaturalist'}</span></div></div>
+      <div class="two"><a class="btn light" href="https://www.inaturalist.org/observations/${encodeURIComponent(o.inatObs)}" target="_blank" rel="noopener">Ver en iNaturalist${I.ext}</a>${q === 'research' && lic ? `<a class="btn" href="https://www.gbif.org/occurrence/search?dataset_key=50c9509d-22c7-4a22-a47d-8c48425ef4a7&catalog_number=${encodeURIComponent(o.inatObs)}" target="_blank" rel="noopener">Buscar en GBIF${I.ext}</a>` : '<button class="btn" data-act="modal-close">Cerrar</button>'}</div>`;
+  } catch { html = '<p class="muted" style="margin:0">No se pudo revisar la observación. Revisa tu conexión.</p>'; }
+  const box = $('#rf-gbif-st');
+  if (box) box.outerHTML = html;
 }
 // Coordenadas UTM (WGS84) con zona y banda de latitud, p. ej. 19H 346300 E 6299500 N.
 function toUTM(lat, lng) {
@@ -1883,7 +2024,7 @@ function openRecEdit(uid) {
   const loc = o.lat != null ? { lat: o.lat, lng: o.lng } : {};
   const sel = o.taxonId ? { taxon: { id: o.taxonId, name: o.sci, preferred_common_name: o.common, default_photo: { square_url: o.photo } }, pct: o.conf ?? null, note: 'Especie actual' } : null;
   S.misSel?.clear();
-  S.nuevo = { edit: uid, orig: o, kind: o.kind, back: location.hash || '#herbario', photos: [{ preview: o.userPhoto || o.photo || '', orig: true, ...loc }], main: 0,
+  S.nuevo = { edit: uid, orig: o, kind: o.kind, mapOpen: false, idOpen: false, back: location.hash || '#herbario', photos: [{ preview: o.userPhoto || o.photo || '', orig: true, ...loc }], main: 0,
     mode: o.taxonId ? 'cat' : 'later', sel, result: null, q: '', catalog: [], notes: o.notes || '', place: o.place || '', uid: o.uid,
     when: o.when || `${o.date || today()}T12:00`, lat: o.lat ?? null, lng: o.lng ?? null };
   S.nvTab = 'nuevo';
@@ -1891,7 +2032,7 @@ function openRecEdit(uid) {
   if (!S.nuevo.place) nuevoPlace();
   if (sel) nuevoClassify();
 }
-function nuevoSaveEdit() {
+function nuevoSaveEdit(stay) {
   const n = S.nuevo, o = S.collection.find((c) => c.uid === n.edit);
   if (!o) { toast('Este registro ya no existe.'); S.nuevo = null; location.hash = n.back; return; }
   const later = n.mode === 'later' || !n.sel || !n.result, mp = n.photos[n.main];
@@ -1911,6 +2052,7 @@ function nuevoSaveEdit() {
   }
   addToCollection(upd);
   if (!wasId && !later) addXP(STATUS_XP[upd.status] || 0, 'registro identificado');
+  if (stay) { n.orig = upd; n.photos = [{ ...mp, orig: true }]; n.main = 0; return; }
   S.nuevo = null;
   location.hash = n.back;
   sfx('pop');
@@ -2757,6 +2899,8 @@ function aliasRowHtml(sp) {
 function refreshAliasViews() {
   const row = $('#al-row');
   if (row && S.ficha) row.innerHTML = aliasRowHtml(S.ficha.sp);
+  const rrow = $('#rf-al-row');
+  if (rrow && S.nuevo?.edit) rrow.innerHTML = rfAliasHtml(S.nuevo);
   if ($('#al-list')) renderAliasList();
   if ($('#s-especies').dataset.ok) renderEspecies();
 }
@@ -3070,7 +3214,12 @@ document.addEventListener('click', async (e) => {
     case 'hb-info': toast('Un género agrupa especies muy emparentadas. Se completa con tus capturas y registros identificados.'); break;
     case 'hb-search': S.hbSearch = !S.hbSearch; if (!S.hbSearch) S.hbQ = ''; renderHerbario(route().arg); $('#hb-q')?.focus(); break;
     case 'aliases': openAliasList(); break;
-    case 'al-add': if (S.ficha) openAliasModal(S.ficha.sp); break;
+    case 'al-add': { const sp = route().name === 'nuevo' && S.nuevo?.edit ? nvAliasSp(S.nuevo) : S.ficha?.sp; if (sp) openAliasModal(sp); break; }
+    case 'rf-id-toggle': S.nuevo.idOpen = !S.nuevo.idOpen; renderNuevo(); break;
+    case 'rf-notes': { const ta = $('#notas'); ta?.focus(); ta?.setSelectionRange(ta.value.length, ta.value.length); break; }
+    case 'rf-inat': rfInatAsk(); break;
+    case 'rf-inat-go': rfInatUpload(); break;
+    case 'rf-gbif': rfGbif(); break;
     case 'al-save': saveAliasModal(); break;
     case 'al-cancel': closeAliasModal(); break;
     case 'al-export': exportAliases(); break;
@@ -3090,7 +3239,7 @@ document.addEventListener('click', async (e) => {
     case 'av-photo-del': deleteAvatarPhoto(); break;
     case 'nv-mode-later': S.nuevo.mode = 'later'; renderNuevo(); break;
     case 'nv-mode-cat': S.nuevo.mode = 'cat'; if (S.nuevo.sel && !S.nuevo.result) nuevoClassify(); else renderNuevo(); break;
-    case 'nv-map-toggle': settings.nvMapHide = !settings.nvMapHide; saveSettings(); renderNuevo(); break;
+    case 'nv-map-toggle': if (S.nuevo?.edit) { S.nuevo.mapOpen = !S.nuevo.mapOpen; renderNuevo(); break; } settings.nvMapHide = !settings.nvMapHide; saveSettings(); renderNuevo(); break;
     case 'nv-map-big': { const n = S.nuevo; n.mapBig = !n.mapBig; t.textContent = n.mapBig ? 'Reducir' : 'Cambiar'; nvMapEl?.classList.toggle('big', n.mapBig); setTimeout(() => { nvMap?.invalidateSize(); refreshNvMap(true); }, 220); break; }
     case 'nv-loc-me': currentLoc().then((ll) => { setNvPhotoLoc(ll.lat, ll.lng, 'gps'); refreshNvMap(true); }); break;
     case 'mr-ftoggle': settings.misFOpen = settings.misFOpen === false; saveSettings(); renderMisRegistros(); break;
