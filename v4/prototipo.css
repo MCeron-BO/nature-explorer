@@ -835,3 +835,17 @@ body.is-offline .map-title span:not(.logo-leaf){color:#B23A2E;font-weight:800}
 .upd-bar{position:absolute;left:12px;right:12px;top:calc(10px + env(safe-area-inset-top));z-index:3500;display:flex;align-items:center;gap:10px;padding:10px 12px 10px 16px;border-radius:14px;background:var(--g900);color:#fff;font-size:14px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.25)}
 .upd-bar span{flex:1}
 .upd-bar button{border:none;border-radius:999px;padding:8px 14px;background:#fff;color:var(--g900);font-weight:800}
+
+/* Nuevo Registro 1.0.25: fotos en miniatura (sin foto grande), buscador antes que «Registradas hace poco» */
+.nv-new .nv-strip{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding-top:6px}
+.nv-new .nv-strip button[data-nv-main]{border-radius:12px;border-width:2.5px}
+.nv-new .nv-strip .nv-add{border-radius:12px}
+.nv-new .nv-strip .nv-add span{font-size:11px}
+.nv-strip .nv-th-gal{aspect-ratio:auto;max-width:none;position:absolute;left:4px;bottom:4px;width:26px;height:26px;border-radius:999px;border:0;background:rgba(255,255,255,.92);color:var(--g900);display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.nv-strip .nv-th-gal svg{width:14px;height:14px}
+.nv-strip .nv-th-gal.done{background:var(--g900);color:#fff}
+.nv-strip .nv-th-gal::after{content:"";position:absolute;inset:-6px}
+.nv-new .nv-row{gap:8px}
+.nv-new .nv-row .chip-btn{padding:0 11px;flex-shrink:0}
+.nv-new .nv-row .chip-btn+.chip-btn{margin-left:-2px}
+.nv-new .nv-row .info b{font-size:14px}
