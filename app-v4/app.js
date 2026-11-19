@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.23';
+const APP_VERSION = '1.0.24';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -2174,7 +2174,9 @@ const recRow = (o, sel, open) => `<div class="mr-row ${sel.has(o.uid) ? 'on' : '
     <span class="mr-ph" style="background-image:url('${esc(o.userPhoto || o.photo)}')"></span>
     <div class="info"><div class="l1"><b>${esc(recName(o))}</b>${o.taxonId || aiNow.has(o.uid) || recName(o) !== 'Sin identificar' ? recSt(o) : ''}</div>${o.taxonId && o.common ? `<i class="sci">${esc(o.sci)}</i>` : ''}<span class="l3">${I.cal}${esc(recDate(o))}<em>·</em>${I.pin}<span>${esc(o.place || (o.lat != null ? `${o.lat.toFixed(4)}, ${o.lng.toFixed(4)}` : 'Sin ubicación'))}</span></span></div>
     <button class="mr-more" data-mr-more="${esc(o.uid)}" aria-label="Opciones de ${esc(recName(o))}">⋮</button>${open ? `<button class="mr-open" data-mr-open="${esc(o.uid)}" aria-label="Ver el detalle de ${esc(recName(o))}" title="Ver detalle">${I.right}</button>` : ''}</div>`;
-const recBar = (nSel) => `<div class="mr-bar"><button data-act="mr-del" ${nSel ? '' : 'disabled'}>${I.trash}<span>Eliminar<small>(${nSel} seleccionado${nSel === 1 ? '' : 's'})</small></span></button><i></i><button data-act="mr-exp" ${nSel ? '' : 'disabled'}>${I.dl}<span>Exportar<small>(${nSel} seleccionado${nSel === 1 ? '' : 's'})</small></span></button></div>`;
+// Versión compacta (detalle de especie del herbario): una línea y la cantidad seleccionada en un círculo.
+const recBar = (nSel, compact) => compact ? `<div class="mr-bar mini" role="group" aria-label="Acciones con los seleccionados"><button data-act="mr-del" ${nSel ? '' : 'disabled'} aria-label="Eliminar ${nSel} seleccionado${nSel === 1 ? '' : 's'}">${I.trash}<span>Eliminar</span><em>${nSel}</em></button><i></i><button data-act="mr-exp" ${nSel ? '' : 'disabled'} aria-label="Exportar ${nSel} seleccionado${nSel === 1 ? '' : 's'}">${I.dl}<span>Exportar</span><em>${nSel}</em></button></div>`
+  : `<div class="mr-bar"><button data-act="mr-del" ${nSel ? '' : 'disabled'}>${I.trash}<span>Eliminar<small>(${nSel} seleccionado${nSel === 1 ? '' : 's'})</small></span></button><i></i><button data-act="mr-exp" ${nSel ? '' : 'disabled'}>${I.dl}<span>Exportar<small>(${nSel} seleccionado${nSel === 1 ? '' : 's'})</small></span></button></div>`;
 function renderMisRegistros() {
   const el = $('#s-nuevo');
   const f = S.misF || 'todas', sort = S.misSort || 'reciente';
@@ -2491,7 +2493,7 @@ function renderHerbSpecies(famName, genName, e) {
       ${ord === 'dia' ? `<div class="hb-day"><label>${I.cal}<span>Día</span><input type="date" id="hb-day" value="${esc(day)}" max="${today()}" aria-label="Fecha de los ${tab === 'reg' ? 'registros' : 'capturas'}"></label>${days.length > 1 ? `<div class="hb-days">${days.slice(0, 12).map((d) => `<button class="${d === day ? 'on' : ''}" data-hbday="${d}">${esc(new Date(`${d}T12:00`).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' }))}</button>`).join('')}</div>` : ''}</div>` : ''}` : ''}
       <div class="flow mr">${rows.length ? `<div class="mr-tools"><label class="mr-ck"><input type="checkbox" data-mr-all="1" ${rows.length && sel.size === rows.length ? 'checked' : ''} aria-label="Seleccionar todos"></label><span>${nf(rows.length)} ${tab === 'reg' ? `registro${rows.length === 1 ? '' : 's'}` : `captura${rows.length === 1 ? '' : 's'}`} · ${ord === 'old' ? 'más antiguos primero' : ord === 'dia' ? `del ${esc(dayTxt)}` : 'más recientes primero'}</span></div>${rows.map((o) => recRow(o, sel, true)).join('')}`
         : `<div class="state">${!all.length ? (tab === 'reg' ? 'No tienes nuevos registros de esta especie.' : 'No has capturado esta especie en el mapa.') : `No tienes ${tab === 'reg' ? 'registros' : 'capturas'} de esta especie el ${esc(dayTxt)}.`}</div>`}
-      ${recBar(sel.size)}</div></div>`;
+      ${recBar(sel.size, true)}</div></div>`;
   $('#hb-day')?.addEventListener('change', (ev) => { if (ev.target.value) { S.hbDay = ev.target.value; S.misSel?.clear(); renderHerbario(route().arg); } });
   el.scrollTop = 0;
 }
