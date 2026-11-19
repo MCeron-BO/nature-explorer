@@ -62,6 +62,18 @@ En los tres primeros niveles se ordena por **Más completados**, **Recientes** o
 - **DEMO** (botón pequeño bajo los botones del mapa): pone 6 especies reales de la zona alrededor de tu avatar, 4 dentro de la distancia de captura y 2 un poco más lejos para probar el radar. Se marcan con la etiqueta «DEMO». Al capturarlas, la cámara ofrece **Simular foto y validación**: usa la foto de la especie, simula la IA y valida con los registros reales de la zona. Lo guardado queda marcado «DEMO» en la colección. Si se toma una foto real, la validación es la normal.
 - **Banner de publicidad**: franja de 30 px sobre la barra inferior con Banco de Chile y CORFO desplazándose; aparece en todas las pantallas (en el inicio y la captura, al pie) y se puede cerrar con la X: vuelve a aparecer a los 10 segundos. Los avisos están en `ADS` en `app.js`; para usar los logos oficiales, agrega el archivo y pon su ruta en `img`.
 
+## Cámara dentro de la app
+
+- **Tomar foto** / **Cámara** (Nuevo Registro) y el disparador al validar una captura abren la **cámara dentro de la app**, sin salir a la app de cámara del teléfono. Así el navegador no se cierra por falta de memoria mientras se toma la foto (que era lo que hacía que la foto no llegara). Con el botón blanco se toma la foto en la resolución completa de la cámara cuando el navegador lo permite; la **X** cierra sin foto.
+- La primera vez el navegador pide **permiso de cámara**. Si no se puede abrir (permiso negado o navegador sin soporte), se avisa y queda el botón **Cámara del teléfono**, que usa la cámara de siempre. **Galería** no cambia.
+- Al elegir o tomar una foto aparece «Cargando la foto…» mientras se reduce y se ubica. La imagen original se libera de la memoria apenas se reduce.
+
+## Actualizaciones en el teléfono
+
+- La app busca versiones nuevas al abrirse, **cada vez que vuelves a ella** y cada 30 minutos (con conexión). Cuando hay una, se **recarga sola** con los cambios.
+- Si estás a mitad de algo (un registro con fotos sin guardar, la ficha de un registro, la cámara, una captura, un aviso abierto o descargando una zona), no se recarga: aparece arriba **«Hay una versión nueva de la app · Actualizar»** para hacerlo cuando quieras.
+- La versión instalada se ve en la pantalla de inicio.
+
 ## Uso sin conexión (cerros y montañas sin señal)
 
 1. **Antes de salir, con conexión:** en el mapa elige el radio y toca el botón de la nube (o **Más › Mapa sin conexión**) y luego **Guardar esta zona**. Se descargan:

@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.22';
+const APP_VERSION = '1.0.23';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -1240,11 +1240,88 @@ async function computerVision(file, lat, lng) {
     .map((x) => ({ taxon: x.taxon, pct: Math.round(x.combined_score ?? x.vision_score ?? 0) }));
 }
 async function shrink(file, max = 640) {
-  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(file); });
+  // Se libera la imagen original apenas se reduce: las fotos de cámara pesan mucho y sin liberar el teléfono se queda sin memoria.
+  const url = URL.createObjectURL(file);
+  let img, done = () => {};
+  try {
+    img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+  } catch {
+    if (!window.createImageBitmap) { URL.revokeObjectURL(url); throw new Error('imagen'); }
+    img = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    done = () => img.close?.();
+  }
+  URL.revokeObjectURL(url);
   const k = Math.min(1, max / Math.max(img.width, img.height));
   const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-  return c.toDataURL('image/jpeg', 0.78);
+  done();
+  const out = c.toDataURL('image/jpeg', 0.78);
+  c.width = c.height = 0;
+  return out;
+}
+/* ---------- cámara dentro de la app ---------- */
+// Al abrir la cámara del teléfono (otra app), el navegador puede cerrarse por falta de memoria y la foto no llega.
+// Por eso se fotografía dentro de la app; si no se puede, queda el botón para usar la cámara del teléfono.
+const camOk = () => !!navigator.mediaDevices?.getUserMedia && window.isSecureContext;
+let camStream = null, camFor = null;
+function stopCamera() { camStream?.getTracks().forEach((tr) => tr.stop()); camStream = null; }
+function closeCamera() {
+  stopCamera(); camFor = null;
+  const el = $('#camx');
+  if (el) { el.hidden = true; el.innerHTML = ''; }
+}
+async function openCamera(target) {
+  closeModal();
+  const run = (camFor = { target });
+  let el = $('#camx');
+  if (!el) { el = document.createElement('div'); el.id = 'camx'; el.className = 'camx'; $('#phone').appendChild(el); }
+  el.hidden = false;
+  el.innerHTML = `<video playsinline muted autoplay></video><div class="camx-msg">Abriendo la cámara…</div>
+    <div class="camx-bar"><button class="camx-x" data-act="cam-close" aria-label="Cerrar la cámara">${I.x}</button><button class="camx-shot" data-act="cam-shot" aria-label="Tomar la foto" disabled><i></i></button>
+    <label class="camx-alt" aria-label="Usar la cámara del teléfono">${I.cam}<span>Cámara del teléfono</span><input type="file" accept="image/*" capture="environment" class="sr" data-photo-input="${target}" data-src="cam" data-camx="1"></label></div>`;
+  try {
+    const st = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 4096 }, height: { ideal: 3072 } } });
+    if (camFor !== run) { st.getTracks().forEach((tr) => tr.stop()); return; }
+    camStream = st;
+    const v = el.querySelector('video');
+    v.srcObject = st;
+    await v.play().catch(() => {});
+    el.querySelector('.camx-msg').hidden = true;
+    el.querySelector('.camx-shot').disabled = false;
+  } catch {
+    if (camFor !== run) return;
+    el.querySelector('.camx-msg').innerHTML = 'No se pudo abrir la cámara aquí. Revisa que el navegador tenga permiso de cámara, o toca <b>Cámara del teléfono</b>.';
+  }
+}
+async function cameraShot() {
+  const el = $('#camx'), v = el?.querySelector('video'), f = camFor;
+  if (!v || !f || !camStream || !v.videoWidth) return;
+  const btn = el.querySelector('.camx-shot');
+  btn.disabled = true;
+  el.querySelector('.camx-msg').hidden = false;
+  el.querySelector('.camx-msg').textContent = 'Tomando la foto…';
+  let blob = null;
+  // Con ImageCapture se obtiene la foto en la resolución completa de la cámara; si no, un cuadro del video.
+  try { if ('ImageCapture' in window) blob = await new ImageCapture(camStream.getVideoTracks()[0]).takePhoto(); } catch { blob = null; }
+  if (!blob) {
+    const cv = document.createElement('canvas');
+    cv.width = v.videoWidth; cv.height = v.videoHeight;
+    cv.getContext('2d').drawImage(v, 0, 0);
+    blob = await new Promise((r) => cv.toBlob(r, 'image/jpeg', 0.92));
+    cv.width = cv.height = 0;
+  }
+  if (camFor !== f) return;
+  closeCamera();
+  if (!blob) { toast('No se pudo tomar la foto. Inténtalo de nuevo.'); return; }
+  sfx('pop');
+  usePhotoFiles(f.target, [new File([blob], `foto-${Date.now()}.jpg`, { type: blob.type || 'image/jpeg', lastModified: Date.now() })], 'cam');
+}
+// Entrega las fotos elegidas a la pantalla que las pidió.
+function usePhotoFiles(target, files, src) {
+  if (!files?.length) return;
+  if (target === 'capture') onCapturePhoto(files[0]);
+  else if (target === 'nuevo') { closeModal(); onNuevoPhoto(files, 'add', src); }
+  else if (target === 'nuevo-replace') { closeModal(); onNuevoPhoto(files, 'replace', src); }
 }
 const taxonToSp = (t) => ({ id: String(t.id), inatId: t.id, sci: t.name, common: cap(t.preferred_common_name), photo: photoUrl(t.default_photo, 'square'), photoM: photoUrl(t.default_photo, 'medium') });
 function addToCollection(entry) {
@@ -1340,7 +1417,7 @@ function renderCaptura() {
       <div class="hint">Busca la planta a tu alrededor y toma una fotografía para validar la observación.</div>
       ${c.sim ? '<button class="sim-shot" data-act="sim-photo">DEMO · Simular foto y validación</button>' : ''}</div>
       <div class="controls"><label class="cam-btn" aria-label="Elegir de la galería">${I.img}<input type="file" accept="image/*" class="sr" data-photo-input="capture"></label>
-      <label class="shutter" aria-label="Tomar fotografía"><i></i><input type="file" accept="image/*" capture="environment" class="sr" data-photo-input="capture"></label><span style="width:48px"></span></div></div>`;
+      <label class="shutter" data-cam="capture" aria-label="Tomar fotografía"><i></i><input type="file" accept="image/*" capture="environment" class="sr" data-photo-input="capture"></label><span style="width:48px"></span></div></div>`;
   } else if (c.step === 'ia') {
     const body = c.analyzing ? `<div class="state"><div class="spinner"></div>${esc(c.stage || 'Analizando…')}<button class="btn ghost" data-step="camara" style="width:auto">Cancelar y volver a la foto</button></div>`
       : c.error ? `<div class="note" style="background:var(--orange50);color:var(--orange)">${esc(c.error)}</div>
@@ -1583,7 +1660,7 @@ function renderNuevo() {
   if (!n.photos.length) {
     el.innerHTML = `${head}<div class="flow">
       <div class="nv-empty">${I.cam}<b>Empieza con una foto</b><span>Fotografía una planta que no aparece en el mapa. Incluye flor, hoja o fruto si es posible.</span></div>
-      <div class="two"><label class="btn">${I.cam}Tomar foto<input type="file" accept="image/*" capture="environment" class="sr" data-photo-input="nuevo" data-src="cam"></label><label class="btn light">${I.img}Galería<input type="file" accept="image/*" multiple class="sr" data-photo-input="nuevo" data-src="gal"></label></div>
+      <div class="two"><label class="btn" data-cam="nuevo">${I.cam}Tomar foto<input type="file" accept="image/*" capture="environment" class="sr" data-photo-input="nuevo" data-src="cam"></label><label class="btn light">${I.img}Galería<input type="file" accept="image/*" multiple class="sr" data-photo-input="nuevo" data-src="gal"></label></div>
       <span class="muted" style="font-size:13px;line-height:1.45">Con la cámara se usa tu ubicación actual; desde la galería, la ubicación guardada en la foto. Después puedes ajustarla en el mapa.</span></div>`;
     return;
   }
@@ -1918,7 +1995,7 @@ function nuevoDiscard(ask) {
 function openPhotoSource(how) {
   const input = how === 'replace' ? 'nuevo-replace' : 'nuevo';
   openModal(`<div class="top"><h2>${how === 'replace' ? 'Cambiar foto principal' : 'Agregar fotos'}</h2><button class="x" data-act="modal-close" aria-label="Cerrar">${I.x}</button></div>
-    <div class="two"><label class="btn">${I.cam}Cámara<input type="file" accept="image/*" capture="environment" class="sr" data-photo-input="${input}" data-src="cam"></label><label class="btn light">${I.img}Galería<input type="file" accept="image/*" ${how === 'replace' ? '' : 'multiple'} class="sr" data-photo-input="${input}" data-src="gal"></label></div>
+    <div class="two"><label class="btn" data-cam="${input}">${I.cam}Cámara<input type="file" accept="image/*" capture="environment" class="sr" data-photo-input="${input}" data-src="cam"></label><label class="btn light">${I.img}Galería<input type="file" accept="image/*" ${how === 'replace' ? '' : 'multiple'} class="sr" data-photo-input="${input}" data-src="gal"></label></div>
     <span class="muted" style="font-size:13px;line-height:1.45">Con la cámara se usa tu ubicación actual; desde la galería, la que trae la foto. Puedes ajustarla en el mapa.</span>`);
 }
 async function catalogSearch() {
@@ -1948,6 +2025,7 @@ async function catalogSearch() {
 async function onNuevoPhoto(files, how, src) {
   const n = nuevoState();
   const list = [...files].slice(0, 8);
+  toast(list.length > 1 ? `Cargando ${list.length} fotos…` : 'Cargando la foto…');
   const hereP = currentLoc();
   const items = [];
   let noGps = 0, fromPhoto = 0;
@@ -2782,7 +2860,33 @@ window.addEventListener('offline', () => {
   renderOfflineBadge(); renderRadii();
   toast(loadZone() ? 'Sin conexión · usando la zona guardada.' : 'Sin conexión. Guarda una zona para usar el mapa sin señal.');
 });
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+// Actualizaciones: se buscan al abrir la app, al volver a ella y cada 30 min. Cuando llega una versión nueva,
+// la app se recarga sola; si estás a mitad de un registro, aparece «Actualizar» para hacerlo cuando quieras.
+const appBusy = () => !!camStream || !!S.zoneJob || !$('#modal').hidden
+  || (S.nuevo && !S.nuevo.saved && (S.nuevo.edit || S.nuevo.photos?.length))
+  || (S.capture && ['camara', 'ia', 'resultado'].includes(S.capture.step));
+function showUpdateBar() {
+  if ($('#upd-bar')) return;
+  const b = document.createElement('div');
+  b.id = 'upd-bar'; b.className = 'upd-bar'; b.setAttribute('role', 'status');
+  b.innerHTML = `<span>Hay una versión nueva de la app</span><button data-act="app-reload">Actualizar</button>`;
+  $('#phone').appendChild(b);
+}
+if ('serviceWorker' in navigator) {
+  const hadCtl = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadCtl || reloading) return;
+    if (appBusy()) { showUpdateBar(); return; }
+    reloading = true;
+    location.reload();
+  });
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
+    const check = () => { if (navigator.onLine) reg.update().catch(() => {}); };
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+    setInterval(check, 30 * 60 * 1000);
+  }).catch(() => {});
+}
 
 /* ---------- barra inferior configurable ---------- */
 const TAB_NAMES = { mapa: 'Mapa', especies: 'Especies', nuevo: 'Registrar', herbario: 'Mi Herbario' };
@@ -3057,6 +3161,9 @@ function show() {
 
 /* ---------- eventos ---------- */
 document.addEventListener('click', async (e) => {
+  // Botones de cámara: se usa la cámara dentro de la app (si el navegador lo permite).
+  const camL = e.target.closest('label[data-cam]');
+  if (camL && camOk()) { e.preventDefault(); openCamera(camL.dataset.cam); return; }
   const t = e.target.closest('button,[data-capture]');
   if (!t) { if (e.target.id === 'modal') closeModal(); return; }
   const d = t.dataset;
@@ -3199,6 +3306,9 @@ document.addEventListener('click', async (e) => {
     case 'dl-open': openDownload(); break;
     case 'dl-go': download().catch((err) => { console.error(err); toast('No se pudo generar el archivo.'); }); break;
     case 'modal-close': closeModal(); break;
+    case 'cam-close': closeCamera(); break;
+    case 'cam-shot': cameraShot(); break;
+    case 'app-reload': location.reload(); break;
     case 'ficha-pdf': fichaPdf(); break;
     case 'cap-confirm': confirmCapture(); break;
     case 'nv-gallery': nuevoGallery(); break;
@@ -3244,9 +3354,12 @@ document.addEventListener('change', (e) => {
   if (!f) return;
   if (e.target.dataset.alImport) { importAliases(f); return; }
   if (e.target.dataset.avInput) { openAvatarCrop(f); e.target.value = ''; return; }
-  if (e.target.dataset.photoInput === 'capture') onCapturePhoto(f);
-  if (e.target.dataset.photoInput === 'nuevo') { onNuevoPhoto(e.target.files, 'add', e.target.dataset.src); closeModal(); }
-  if (e.target.dataset.photoInput === 'nuevo-replace') { onNuevoPhoto(e.target.files, 'replace', e.target.dataset.src); closeModal(); }
+  if (e.target.dataset.photoInput) {
+    const files = [...e.target.files];
+    if (e.target.dataset.camx) closeCamera();
+    usePhotoFiles(e.target.dataset.photoInput, files, e.target.dataset.src);
+    e.target.value = '';
+  }
 });
 // Con GPS real, el avatar te sigue mientras caminas (watchPosition) y el radar suena al acercarte.
 let watchId = null;
