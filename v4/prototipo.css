@@ -750,8 +750,34 @@ body.is-offline .map-title span:not(.logo-leaf){color:#B23A2E;font-weight:800}
 .hb-rec-top a.dl-mini{text-decoration:none}
 .hb-recs .flow.mr{padding:0}
 .hb-recs .mr-tools span{font-size:12px;color:var(--ink2)}
-.hb-recs .mr-bar{bottom:0;margin:10px -14px -24px;padding:10px 14px 16px}
-#phone.tabs-off .hb-recs .mr-bar{bottom:0;margin-bottom:-24px;padding-bottom:16px}
+/* Sin barra de desplazamiento propia: la lista se desplaza con la pantalla y no se sale por los lados */
+.hb-recs .flow.mr{flex:none;overflow:visible;min-width:0}
+.hb-recs .mr-bar{bottom:0;margin:8px 0 -12px;padding:8px 0 12px}
+#phone.tabs-off .hb-recs .mr-bar{bottom:0;margin-bottom:-12px;padding-bottom:12px}
+/* Barra compacta: Eliminar · Exportar en una línea */
+.mr-bar.mini{gap:0}
+.mr-bar.mini button{height:40px;gap:6px;font-size:13.5px}
+.mr-bar.mini button:first-child{border-radius:14px 0 0 14px}
+.mr-bar.mini button:last-child{border-radius:0 14px 14px 0}
+.mr-bar.mini button svg{width:18px;height:18px}
+.mr-bar.mini button span{display:inline;line-height:1}
+.mr-bar.mini em{font-style:normal;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:rgba(255,255,255,.22);font-size:11.5px;font-weight:800;display:grid;place-items:center}
+.mr-bar.mini i{margin:8px 0}
+/* Filas más compactas para ver más registros */
+.hb-recs .mr-row{gap:6px;padding:4px 0}
+.hb-recs .mr-ph{width:40px;height:40px;border-radius:8px}
+.hb-recs .mr-row .info b{font-size:13px;line-height:1.2}
+/* Todas las filas son de la misma especie: el nombre científico ya está arriba */
+.hb-recs .mr-row .info .sci{display:none}
+.hb-recs .mr-row .info .l3{font-size:10.5px;line-height:1.25}
+.hb-recs .mr-row .info svg{width:11px;height:11px}
+.hb-recs .mr-st{font-size:9.5px;padding:1px 6px}
+.hb-recs .mr-st svg{width:10px;height:10px}
+.hb-recs .mr-more{width:24px;height:34px;font-size:19px}
+.hb-recs .mr-open{width:28px;height:28px}
+.hb-recs .mr-open svg{width:15px;height:15px}
+.hb-recs .mr-ck{width:24px;height:24px}
+.hb-recs .mr-ck input{width:18px;height:18px}
 
 /* Herbario: acceso directo al detalle del registro */
 .mr-open{width:34px;height:34px;flex-shrink:0;border:none;border-radius:999px;background:var(--g100);color:var(--g900);display:grid;place-items:center;margin-left:2px}
