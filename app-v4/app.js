@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.24';
+const APP_VERSION = '1.0.25';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -1635,7 +1635,7 @@ const LOC_SRC = { foto: 'de la foto', gps: 'GPS', actual: 'GPS · la foto no tra
 function nvLocTexts(n) {
   const p = n.photos[n.main];
   const t = `Ubicación${n.photos.length > 1 ? ` · foto ${n.main + 1}` : ''}${p?.src ? ` (${LOC_SRC[p.src]})` : ''}`;
-  const sub = n.lat == null ? 'Sin ubicación · toca el mapa' : n.place || `${n.lat.toFixed(5)}, ${n.lng.toFixed(5)}`;
+  const sub = n.lat == null ? ((n.edit ? n.mapOpen : n.mapEdit || settings.nvMapHide === false) ? 'Sin ubicación · toca el mapa' : 'Sin ubicación · toca «Editar»') : n.place || `${n.lat.toFixed(5)}, ${n.lng.toFixed(5)}`;
   return [t, sub];
 }
 function updateNvLoc() {
@@ -1672,26 +1672,27 @@ function renderNuevo() {
   const chosen = n.sel ? `<div class="muted" style="font-size:12px;font-weight:700">Especie elegida</div><div class="nv-match on">${thumb(photoUrl(n.sel.taxon.default_photo, 'square'), 'sm')}<span class="info"><b class="sci">${esc(n.sel.taxon.name)}</b><span>${esc(cap(n.sel.taxon.preferred_common_name) || n.sel.note || '')}</span></span></div>` : '';
   const ident = later
     ? `<div class="nv-later">${I.ai}<span><b>Se guardará con el alias en «sin identificar»</b>${settings.token ? 'En Mis Registros la IA de iNaturalist la identifica automáticamente y puedes cambiar la especie si no es correcta.' : 'En Mis Registros la IA la identifica automáticamente cuando agregues tu token de iNaturalist en Ajustes.'}</span></div>`
-    : `${recent.length ? `<div class="nv-recent"><span class="nv-recent-k">Registradas hace poco · toca para elegir</span><div class="nv-recent-row">${recent.map((t, i) => `<button class="${isSel(t) ? 'on' : ''}" data-nv-recent="${i}" aria-label="Elegir ${esc(cap(t.preferred_common_name) || t.name)}"><span class="ph" style="background-image:url('${esc(photoUrl(t.default_photo, 'square'))}')">${isSel(t) ? I.check : ''}</span><b>${esc(cap(t.preferred_common_name) || t.name)}</b><i class="sci">${esc(t.name)}</i></button>`).join('')}</div></div>` : ''}
-      <div class="nv-matches">${chosen}<div class="search">${I.search}<label for="cat" class="sr">Buscar en el catálogo oficial</label><input id="cat" type="search" placeholder="Buscar especie: ingresa un alias" value="${esc(n.q)}" autocomplete="off"></div><div id="cat-res"></div></div>`;
+    : `<div class="nv-matches"><div class="search">${I.search}<label for="cat" class="sr">Buscar especie: nombre común, científico o alias</label><input id="cat" type="search" placeholder="Buscar especie: nombre común, científico o alias" value="${esc(n.q)}" autocomplete="off"></div><div id="cat-res"></div></div>
+      ${recent.length ? `<div class="nv-recent"><span class="nv-recent-k">Registradas hace poco · toca para elegir</span><div class="nv-recent-row">${recent.map((t, i) => `<button class="${isSel(t) ? 'on' : ''}" data-nv-recent="${i}" aria-label="Elegir ${esc(cap(t.preferred_common_name) || t.name)}"><span class="ph" style="background-image:url('${esc(photoUrl(t.default_photo, 'square'))}')">${isSel(t) ? I.check : ''}</span><b>${esc(cap(t.preferred_common_name) || t.name)}</b><i class="sci">${esc(t.name)}</i></button>`).join('')}</div></div>` : ''}
+      ${chosen ? `<div class="nv-matches">${chosen}</div>` : ''}`;
   const [locT, locS] = nvLocTexts(n);
   const ready = n.lat != null && (later || (r && !n.classifying));
   const why = n.lat == null ? 'Marca en el mapa dónde tomaste la foto.' : !later && !n.sel ? 'Elige la especie o toca «Identificar después».' : '';
   if (n.edit) { renderRecFicha(el, n, { head, main, later, ready, why }); return; }
-  el.innerHTML = `${head}<div class="flow nv">
-    <div class="nv-hero" style="background-image:url('${main.preview}')"><button class="nv-gal ${main.savedGal ? 'done' : ''}" data-act="nv-gallery" title="${main.savedGal ? 'Foto guardada en la galería' : 'Guardar en galería'}" aria-label="${main.savedGal ? 'Foto guardada en la galería. Guardar de nuevo' : 'Guardar esta foto en la galería del teléfono'}">${main.savedGal ? I.check : I.dl}</button><button class="nv-edit nv-edit-del" data-nv-del="${n.main}" aria-label="Eliminar esta foto">${I.trash}</button><button class="nv-edit" data-act="nv-replace-photo" aria-label="Cambiar foto principal">${I.edit}</button></div>
-    <div class="nv-strip">${n.photos.map((p, i) => `<div class="nv-th"><button class="${i === n.main ? 'on' : ''}" data-nv-main="${i}" aria-label="Foto ${i + 1}" style="background-image:url('${p.preview}')"></button><button class="nv-del" data-nv-del="${i}" aria-label="Eliminar la foto ${i + 1}">${I.x}</button></div>`).join('')}${n.photos.length < 9 ? '<button class="nv-add" data-act="nv-add-photo"><b>+</b><span>Agregar fotos</span></button>' : ''}</div>
-    <div class="nv-row ${n.lat == null ? 'need' : ''}">${I.pin}<span class="info"><b id="nv-loc-t">${esc(locT)}</b><span id="nv-loc-s">${esc(locS)}</span></span>${settings.nvMapHide ? '' : `<button class="chip-btn" data-act="nv-map-big" id="nv-map-big">${n.mapBig ? 'Reducir' : 'Cambiar'}</button>`}<button class="chip-btn nv-map-tg" data-act="nv-map-toggle" aria-expanded="${!settings.nvMapHide}">${settings.nvMapHide ? `${I.pin}Mostrar mapa` : 'Ocultar'}</button></div>
-    ${settings.nvMapHide ? '' : `<div id="nv-map-slot"></div>
-    <span class="nv-map-hint">Toca el mapa o arrastra la foto para ajustar la ubicación${n.photos.length > 1 ? '. Cada foto tiene la suya: elige la foto arriba o su número en el mapa.' : '.'}</span>`}
-    <div class="nv-row">${I.cal}<span class="info"><b>Fecha y hora</b><span>${esc(fmtWhen(n.when))}</span></span><button class="chip-btn" data-act="nv-edit-when">${n.editWhen ? 'Listo' : 'Editar'}</button></div>
-    ${n.editWhen ? `<div class="nv-edit-box"><div class="field"><label for="nv-when">Fecha y hora de la observación</label><input id="nv-when" type="datetime-local" value="${esc(n.when)}"></div></div>` : ''}
+  const mapOn = !!n.mapEdit || settings.nvMapHide === false;
+  el.innerHTML = `${head}<div class="flow nv nv-new">
+    <div class="nv-strip">${n.photos.map((p, i) => `<div class="nv-th"><button class="${i === n.main ? 'on' : ''}" data-nv-main="${i}" aria-label="Foto ${i + 1}${i === n.main ? ' (principal)' : ''}" style="background-image:url('${p.preview}')"></button><button class="nv-del" data-nv-del="${i}" aria-label="Eliminar la foto ${i + 1}">${I.x}</button>${i === n.main ? `<button class="nv-th-gal ${p.savedGal ? 'done' : ''}" data-act="nv-gallery" title="${p.savedGal ? 'Foto guardada en la galería' : 'Guardar en galería'}" aria-label="${p.savedGal ? 'Foto guardada en la galería. Guardar de nuevo' : 'Guardar esta foto en la galería del teléfono'}">${p.savedGal ? I.check : I.dl}</button>` : ''}</div>`).join('')}${n.photos.length < 9 ? '<button class="nv-add" data-act="nv-add-photo"><b>+</b><span>Agregar fotos</span></button>' : ''}</div>
     <div class="nv-modes"><button class="${!later ? 'on' : ''}" data-act="nv-mode-cat">${I.book}Identificar especie</button><button class="${later ? 'on' : ''}" data-act="nv-mode-later">${I.ai}Identificar después</button></div>
     ${ident}
     ${later ? '' : n.classifying ? '<div class="state" style="padding:8px"><div class="spinner"></div>Comparando con registros de GBIF e iNaturalist…</div>'
       : r ? `<div class="nv-status" style="--sb:${r.bg};--sf:${r.fg}"><i>${I[r.icon]}</i><span><b>${r.tag}</b>${n.result.status === 'validada' ? `Hay ${nf(n.result.near)} registros de esta especie en un radio de ${S.radius} km.` : n.result.status === 'nuevo_local' ? `No hay registros de esta especie en un radio de ${S.radius} km. ¡Podrías ser la primera persona en registrarla en esta zona!` : r.body}</span></div>` : ''}
+    <div class="nv-row ${n.lat == null ? 'need' : ''}">${I.pin}<span class="info"><b id="nv-loc-t">${esc(locT)}</b><span id="nv-loc-s">${esc(locS)}</span></span><button class="chip-btn nv-map-tg" data-act="nv-map-toggle" aria-expanded="${mapOn}">${mapOn ? 'Ocultar mapa' : 'Mostrar mapa'}</button><button class="chip-btn" data-act="${mapOn ? 'nv-map-big' : 'nv-map-edit'}" id="nv-map-big">${mapOn && n.mapBig ? 'Reducir' : 'Editar'}</button></div>
+    ${mapOn ? `<div id="nv-map-slot"></div>
+    <span class="nv-map-hint">Toca el mapa o arrastra la foto para ajustar la ubicación${n.photos.length > 1 ? '. Cada foto tiene la suya: elige la foto arriba o su número en el mapa.' : '.'}</span>` : ''}
+    <div class="nv-row">${I.cal}<span class="info"><b>Fecha y hora</b><span>${esc(fmtWhen(n.when))}</span></span><button class="chip-btn" data-act="nv-edit-when">${n.editWhen ? 'Listo' : 'Editar'}</button></div>
+    ${n.editWhen ? `<div class="nv-edit-box"><div class="field"><label for="nv-when">Fecha y hora de la observación</label><input id="nv-when" type="datetime-local" value="${esc(n.when)}"></div></div>` : ''}
     <div class="field"><label for="notas">Notas de campo</label><textarea id="notas" rows="2" placeholder="Hábitat, número de individuos, fenología…">${esc(n.notes)}</textarea></div>
-    ${n.edit ? '' : `<button class="btn ghost nv-discard-b" data-act="nv-discard">${I.trash}Descartar y empezar de nuevo</button>`}
+    <button class="btn ghost nv-discard-b" data-act="nv-discard">${I.trash}Descartar y empezar de nuevo</button>
     <div class="nv-savebar">${why ? `<span>${why}</span>` : ''}<button class="btn nv-save" data-act="nv-save" ${ready ? '' : 'disabled'}>${I.check}${n.edit ? 'Guardar cambios' : 'Guardar observación'}</button></div></div>`;
   mountNvMap();
   if (!later) {
@@ -3319,8 +3320,9 @@ document.addEventListener('click', async (e) => {
     case 'av-photo-del': deleteAvatarPhoto(); break;
     case 'nv-mode-later': S.nuevo.mode = 'later'; renderNuevo(); break;
     case 'nv-mode-cat': S.nuevo.mode = 'cat'; if (S.nuevo.sel && !S.nuevo.result) nuevoClassify(); else renderNuevo(); break;
-    case 'nv-map-toggle': if (S.nuevo?.edit) { S.nuevo.mapOpen = !S.nuevo.mapOpen; renderNuevo(); break; } settings.nvMapHide = !settings.nvMapHide; saveSettings(); renderNuevo(); break;
-    case 'nv-map-big': { const n = S.nuevo; n.mapBig = !n.mapBig; t.textContent = n.mapBig ? 'Reducir' : 'Cambiar'; nvMapEl?.classList.toggle('big', n.mapBig); setTimeout(() => { nvMap?.invalidateSize(); refreshNvMap(true); }, 220); break; }
+    case 'nv-map-toggle': { const n = S.nuevo; if (n?.edit) { n.mapOpen = !n.mapOpen; renderNuevo(); break; } const on = !!n?.mapEdit || settings.nvMapHide === false; if (n) { n.mapEdit = false; n.mapBig = false; } settings.nvMapHide = on; saveSettings(); renderNuevo(); break; }
+    case 'nv-map-edit': if (S.nuevo) { S.nuevo.mapEdit = true; S.nuevo.mapBig = true; renderNuevo(); } break;
+    case 'nv-map-big': { const n = S.nuevo; n.mapBig = !n.mapBig; t.textContent = n.mapBig ? 'Reducir' : n.edit ? 'Cambiar' : 'Editar'; nvMapEl?.classList.toggle('big', n.mapBig); setTimeout(() => { nvMap?.invalidateSize(); refreshNvMap(true); }, 220); break; }
     case 'nv-loc-me': currentLoc().then((ll) => { setNvPhotoLoc(ll.lat, ll.lng, 'gps'); refreshNvMap(true); }); break;
     case 'mr-ftoggle': settings.misFOpen = settings.misFOpen === false; saveSettings(); renderMisRegistros(); break;
     case 'mr-del': if (S.misSel?.size) confirmRecDelete([...S.misSel]); break;
