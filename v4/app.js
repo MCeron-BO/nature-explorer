@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.25';
+const APP_VERSION = '1.0.26';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -1648,6 +1648,7 @@ function renderNuevo() {
   const el = $('#s-nuevo');
   if (S.nvTab === 'mis') { renderMisRegistros(); return; }
   const n = nuevoState();
+  if (n.plOpen && !n.saved && n.photos.length) { renderPlanilla(el, n); return; }
   const dirty = !n.saved && n.photos.length > 0;
   const head = n.edit ? `<header class="head"><div class="title-row"><a href="${esc(n.back)}" class="icon-btn" aria-label="Volver sin guardar">${I.back}</a><div style="flex:1;min-width:0"><h1>${n.kind === 'nuevo' ? 'Detalle del registro' : 'Detalle de la captura'}</h1><span class="muted" style="font-size:13px">Si vuelves sin guardar, no se aplican los cambios.</span></div><span class="rf-chip">En tu colección</span></div></header>`
     : `<header class="head"><div class="title-row"><a href="#mapa" class="icon-btn" aria-label="Volver al mapa">${I.back}</a><div style="flex:1;min-width:0"><h1>Nuevo Registro (Flora)</h1><span class="muted" style="font-size:13px">${dirty ? 'Si vuelves sin guardar, se descarta lo ingresado' : 'Fotografía una planta y ayúdanos a conocer la biodiversidad'}</span></div>${dirty ? `<button class="nv-discard" data-act="nv-discard" aria-label="Descartar registro y empezar de nuevo">${I.trash}<span>Descartar</span></button>` : ''}</div>${nvTabs('nuevo')}</header>`;
@@ -1692,6 +1693,7 @@ function renderNuevo() {
     <div class="nv-row">${I.cal}<span class="info"><b>Fecha y hora</b><span>${esc(fmtWhen(n.when))}</span></span><button class="chip-btn" data-act="nv-edit-when">${n.editWhen ? 'Listo' : 'Editar'}</button></div>
     ${n.editWhen ? `<div class="nv-edit-box"><div class="field"><label for="nv-when">Fecha y hora de la observación</label><input id="nv-when" type="datetime-local" value="${esc(n.when)}"></div></div>` : ''}
     <div class="field"><label for="notas">Notas de campo</label><textarea id="notas" rows="2" placeholder="Hábitat, número de individuos, fenología…">${esc(n.notes)}</textarea></div>
+    ${plLinkHtml(n)}
     <button class="btn ghost nv-discard-b" data-act="nv-discard">${I.trash}Descartar y empezar de nuevo</button>
     <div class="nv-savebar">${why ? `<span>${why}</span>` : ''}<button class="btn nv-save" data-act="nv-save" ${ready ? '' : 'disabled'}>${I.check}${n.edit ? 'Guardar cambios' : 'Guardar observación'}</button></div></div>`;
   mountNvMap();
@@ -1701,6 +1703,182 @@ function renderNuevo() {
   }
   $('#notas').addEventListener('input', (e) => { n.notes = e.target.value; });
   $('#nv-when')?.addEventListener('change', (e) => { if (e.target.value) n.when = e.target.value; });
+}
+/* ---------- formulario A-40 (planilla de terreno, hoja «Individuos») ---------- */
+// Campos, listas y cálculos de docs/XPE_A-40_Planilla_Terreno_BNP_Operativa.xlsx (columnas A a X).
+// Se completan desde «Completar Formulario» en el registro y quedan en el registro como `planilla`.
+const PL_LISTS = {
+  especie: ['Prosopis chilensis', 'Porlieria chilensis', 'Otra especie en categoría (indicar en Obs.)'],
+  tipoDiam: ['DAP 1,3 m', 'Basal (multivástago)'],
+  repro: ['Flores', 'Frutos', 'Flores y frutos', 'Indirecta (restos de frutos)', 'Sin evidencia'],
+  critica: ['Ninguna', 'Galerías o aserrín reciente', 'Chancros', 'Mortalidad regresiva', 'Sonido hueco del fuste', 'Pudrición en la base'],
+  alerta: ['No', 'Bosque dentro del footprint', 'Replanteo a < 2 diámetros de copa', 'Bosque podría quedar < 40 m de ancho', 'Bosque no cartografiado', 'Daño por actividades del Proyecto'],
+  cond: ['Bosque', 'Dudoso', 'No bosque']
+};
+const PL_PREFIX = ['PRCH', 'POCH', 'ECC'];
+// req: 'all' = siempre obligatorio; 'b' = obligatorio si el parche no es «No bosque».
+const PL_F = [
+  { k: 'id', col: 'ID', l: 'ID del individuo', t: 'text', req: 'all', h: 'PRCH-### (Prosopis), POCH-### (Porlieria), ECC-### (otra especie). Marcar con cinta.' },
+  { k: 'fecha', col: 'Fecha', l: 'Fecha', t: 'date', req: 'all' },
+  { k: 'parche', col: 'Parche', l: 'Parche y su condición', t: 'parche', req: 'all', h: 'Código del parche (hoja Parches). FOOTPRINT si el individuo está dentro del footprint.' },
+  { k: 'especie', col: 'Especie', l: 'Especie', t: 'sel', o: 'especie', req: 'all' },
+  { k: 'este', col: 'Este', l: 'Este (m)', t: 'num', min: 200000, max: 500000, step: '1', req: 'all', h: 'En la base del fuste. Se completa con la ubicación del registro.' },
+  { k: 'norte', col: 'Norte', l: 'Norte (m)', t: 'num', min: 6000000, max: 7000000, step: '1', req: 'all' },
+  { k: 'altura', col: 'Altura_m', l: 'Altura (m)', t: 'num', min: 0, max: 30, step: '0.1', req: 'b', h: 'Altura total (madurez: más de 2 m).' },
+  { k: 'diam', col: 'Diam_cm', l: 'Diámetro (cm)', t: 'num', min: 0, max: 300, step: '0.1', req: 'b', h: 'Vástago mayor: DAP a 1,3 m si es de fuste único; diámetro basal si es multivástago.' },
+  { k: 'tipoDiam', col: 'Tipo_diam', l: 'Tipo de diámetro', t: 'sel', o: 'tipoDiam', req: 'b' },
+  { k: 'copaNS', col: 'Copa_NS_m', l: 'Copa norte-sur (m)', t: 'num', min: 0, max: 40, step: '0.1', req: 'b', h: 'Entre los bordes de la proyección de la copa, con huincha.' },
+  { k: 'copaEO', col: 'Copa_EO_m', l: 'Copa este-oeste (m)', t: 'num', min: 0, max: 40, step: '0.1', req: 'b' },
+  { k: 'repro', col: 'Reproductivo', l: 'Evidencia reproductiva', t: 'sel', o: 'repro', req: 'b', h: 'Revisar la copa con binoculares. Restos de frutos bajo la copa = «Indirecta».' },
+  { k: 'fFuste', col: 'Fito_fuste', l: 'Fuste, copa, corteza y raíces (pts)', t: 'num', min: 0, max: 25, step: '0.5', req: 'b', h: 'Suma de anomalías según la tarjeta (0 si todo está normal).' },
+  { k: 'fHojas', col: 'Fito_hojas', l: 'Hojas (pts)', t: 'num', min: 0, max: 20, step: '0.5', req: 'b', h: 'Incluye polvo y ramoneo.' },
+  { k: 'fFlores', col: 'Fito_flores', l: 'Flores y frutos (pts)', t: 'num', min: 0, max: 7, step: '0.5', req: '', h: 'Dejar vacío si no hay flores ni frutos.' },
+  { k: 'critica', col: 'Critica', l: 'Condición crítica', t: 'sel', o: 'critica', req: 'b', h: 'Cualquier condición crítica clasifica el estado como «Muy malo».' },
+  { k: 'foto', col: 'Foto', l: 'Foto', t: 'text', req: '', h: 'N° o nombre de la fotografía general con jalón (archivo nombrado con el ID).' },
+  { k: 'alerta', col: 'Alerta', l: 'Alerta', t: 'sel', o: 'alerta', req: 'b', h: 'Hallazgo que se informa el mismo día.' },
+  { k: 'obs', col: 'Obs', l: 'Observaciones', t: 'area', req: '', h: 'Sólo lo relevante: especie «otra», daños, dudas.' }
+];
+// Secciones del formulario; las marcadas con true no se llenan en parches «No bosque».
+const PL_SEC = [
+  ['Identificación', ['id', 'fecha', 'parche', 'especie']],
+  ['Coordenadas UTM (WGS84 19S)', ['este', 'norte']],
+  ['Medidas', ['altura', 'diam', 'tipoDiam', 'copaNS', 'copaEO'], true],
+  ['Reproductivo', ['repro'], true],
+  ['Estado fitosanitario', ['fFuste', 'fHojas', 'fFlores', 'critica'], true],
+  ['Foto, alerta y observaciones', ['foto', 'alerta', 'obs']]
+];
+const PL_PAUTA = [
+  ['Fuste, copa, corteza y raíces (máx. 25)', [['Fuste con curva suave', '0,5'], ['Concavidades, arqueaduras o torceduras fuertes', '1'], ['1 a 3 ramas muertas', '2'], ['Más de 3 ramas muertas', '4'], ['Copa cargada', '2'], ['Copa quebrada', '4'], ['Raíces superficiales o a la vista', '3'], ['Corteza suelta en fuste', '4'], ['Daños o cortas', '2'], ['Pérdida de follaje 5–20 % / 20–40 % / > 40 %', '2 / 3 / 5'], ['Plantas parásitas', '2']]],
+  ['Hojas (máx. 20)', [['Turgentes 50–80 % / ≥ 50 % flácidas', '2 / 4'], ['Coloración anómala 5–20 % / 20–50 % / > 50 %', '1 / 2 / 3'], ['Hongos o plagas < 5 % / 5–25 % / > 25 % de la copa', '2 / 3 / 5'], ['Polvo: capa fina / capa opaca', '1 / 4'], ['Ramoneo < 5 % / 5–25 % / > 25 % de la copa', '2 / 3 / 4']]],
+  ['Flores y frutos (máx. 7, sólo si hay)', [['Flores o frutos dañados < 5 % / frutos dañados > 5 %', '2 / 4'], ['Flores secas sin fecundar 5–25 % / > 25 %', '2 / 3']]]
+];
+const plEmpty = (v) => v === '' || v == null;
+const plNum = (v) => (plEmpty(v) || isNaN(+v) ? 0 : +v);
+const plKey = (c) => String(c || '').trim().toUpperCase();
+// Condición de cada parche (hoja «Parches»): se recuerda en el teléfono; FOOTPRINT es «No bosque».
+const plParcheCond = (c) => (settings.plParches || {})[plKey(c)] || (plKey(c) === 'FOOTPRINT' ? 'No bosque' : '');
+const plParches = () => [...new Set(['FOOTPRINT', ...Object.keys(settings.plParches || {}), ...S.collection.map((o) => plKey(o.planilla?.parche)).filter(Boolean)])];
+const plReq = (f, c) => f.req === 'all' || (f.req === 'b' && !c.noB);
+// Columnas grises de la planilla (T a X), con las mismas fórmulas.
+function plCalc(p) {
+  const cond = !p.parche ? '' : plParcheCond(p.parche) || 'Parche no registrado';
+  const noB = cond === 'No bosque';
+  const radio = plNum(p.copaNS) > 0 && plNum(p.copaEO) > 0 ? (+p.copaNS + +p.copaEO) / 4 : null;
+  const td = String(p.tipoDiam || '');
+  const tam = plNum(p.altura) > 2 && ((td.startsWith('DAP') && plNum(p.diam) >= 5) || (td.startsWith('Bas') && plNum(p.diam) >= 6));
+  const maduro = !p.id ? '' : tam && ['Flores', 'Frutos', 'Flores y frutos'].includes(p.repro) ? 'Sí' : tam && String(p.repro || '').startsWith('Indirecta') ? 'Revisar' : 'No';
+  const sum = plNum(p.fFuste) + plNum(p.fHojas) + plNum(p.fFlores);
+  const fito = !p.id ? '' : noB ? 'No aplica' : p.critica && p.critica !== 'Ninguna' ? 'Muy malo' : plEmpty(p.fFuste) || plEmpty(p.fHojas) ? 'Incompleto'
+    : sum <= 1 ? 'Muy bueno' : sum <= 2 ? 'Bueno' : sum <= 3 ? 'Regular' : sum <= 7 ? 'Malo' : 'Muy malo';
+  const miss = PL_F.filter((f) => plReq(f, { noB }) && plEmpty(p[f.k]));
+  const bad = PL_F.filter((f) => f.t === 'num' && !plEmpty(p[f.k]) && (isNaN(+p[f.k]) || +p[f.k] < f.min || +p[f.k] > f.max));
+  return { cond, noB, radio, maduro, fito, miss, bad, sum, completo: !p.id ? '' : miss.length ? 'Falta' : 'Sí' };
+}
+function plNextId(esp, uid) {
+  const pre = PL_PREFIX[PL_LISTS.especie.indexOf(esp)];
+  if (!pre) return '';
+  let max = 0;
+  for (const o of S.collection) {
+    const m = o.uid !== uid && String(o.planilla?.id || '').match(new RegExp(`^${pre}-(\\d+)$`));
+    if (m) max = Math.max(max, +m[1]);
+  }
+  return `${pre}-${String(max + 1).padStart(3, '0')}`;
+}
+// Mientras no se editen a mano: ID correlativo según la especie, foto = ID y coordenadas UTM desde la ubicación.
+function plAuto(n) {
+  const p = n.pl, a = p.auto || {};
+  if (a.id) p.id = plNextId(p.especie, n.uid);
+  if (a.foto) p.foto = p.id;
+  if (a.xy && n.lat != null) { const u = toUTM(n.lat, n.lng); p.este = String(u.E); p.norte = String(u.N); p.zone = u.zone; }
+}
+function plInit(n) {
+  if (n.pl) return n.pl;
+  const sp = n.mode !== 'later' && n.sel ? n.sel.taxon.name : '';
+  const esp = PL_LISTS.especie.includes(sp) ? sp : sp ? PL_LISTS.especie[2] : '';
+  n.pl = { id: '', fecha: n.when.slice(0, 10), parche: settings.plLastParche || '', especie: esp, este: '', norte: '', altura: '', diam: '', tipoDiam: '', copaNS: '', copaEO: '', repro: '',
+    fFuste: '', fHojas: '', fFlores: '', critica: 'Ninguna', foto: '', alerta: 'No', obs: '', auto: { id: true, foto: true, xy: true } };
+  plAuto(n);
+  return n.pl;
+}
+// Lo que se guarda en el registro: sin los valores automáticos pendientes (el ID ya no cambia).
+const plSave = (n) => { if (!n.pl) return undefined; const { auto, ...r } = n.pl; n.pl.auto = {}; return r; };
+function plLinkHtml(n) {
+  const c = n.pl ? plCalc(n.pl) : null;
+  const sub = !c ? 'Planilla A-40 · datos del individuo' : c.completo === 'Sí' ? `${n.pl.id} · completo` : `${n.pl.id || 'Sin ID'} · falta${c.miss.length === 1 ? '' : 'n'} ${c.miss.length} campo${c.miss.length === 1 ? '' : 's'}`;
+  return `<button class="pl-link ${c ? (c.completo === 'Sí' ? 'ok' : 'part') : ''}" data-act="pl-open">${I.book}<span><b>Completar Formulario</b><small>${esc(sub)}</small></span>${I.right}</button>`;
+}
+function plFieldHtml(f, p, c) {
+  const v = p[f.k] ?? '', req = plReq(f, c), id = `pl-${f.k}`;
+  let input;
+  if (f.t === 'sel') input = `<select id="${id}" data-pl="${f.k}"><option value="">Elegir…</option>${PL_LISTS[f.o].map((o) => `<option ${o === v ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+  else if (f.t === 'area') input = `<textarea id="${id}" data-pl="${f.k}" rows="2">${esc(v)}</textarea>`;
+  else if (f.t === 'parche') input = `<div class="pl-parche"><input id="${id}" data-pl="parche" list="pl-parches" value="${esc(v)}" autocomplete="off" autocapitalize="characters" placeholder="P-01"><select data-pl="cond" aria-label="Condición del parche"><option value="">Condición…</option>${PL_LISTS.cond.map((o) => `<option ${o === c.cond ? 'selected' : ''}>${o}</option>`).join('')}</select></div><datalist id="pl-parches">${plParches().map((x) => `<option value="${esc(x)}">`).join('')}</datalist>`;
+  else input = `<input id="${id}" data-pl="${f.k}" type="${f.t === 'num' ? 'number' : f.t}" ${f.t === 'num' ? `inputmode="decimal" min="${f.min}" max="${f.max}" step="${f.step}"` : ''} value="${esc(v)}">`;
+  return `<div class="field pl-f ${req && plEmpty(v) ? 'miss' : ''} ${c.bad.includes(f) ? 'bad' : ''}" data-plf="${f.k}"><label for="${id}">${esc(f.l)}${req ? '<i aria-label="obligatorio">*</i>' : ''}</label>${input}${f.t === 'num' ? `<em class="pl-err">Debe estar entre ${nf(f.min)} y ${nf(f.max)}</em>` : ''}${f.h ? `<small>${esc(f.h)}</small>` : ''}</div>`;
+}
+function plCalcHtml(c) {
+  const row = (k, v, cls = '') => `<div class="pl-c ${cls}"><span>${k}</span><b>${esc(v || '—')}</b></div>`;
+  return row('En bosque', c.cond, c.cond === 'Parche no registrado' ? 'warn' : '')
+    + row('Radio de copa', c.radio != null ? `${c.radio.toFixed(2).replace('.', ',')} m` : '')
+    + row('Maduro', c.maduro, c.maduro === 'Revisar' ? 'warn' : '')
+    + row('Estado fitosanitario', c.fito, ['Incompleto', 'Malo', 'Muy malo'].includes(c.fito) ? 'warn' : '')
+    + row('Completo', c.completo === 'Falta' ? `Falta${c.miss.length === 1 ? '' : 'n'} ${c.miss.length}` : c.completo, c.completo === 'Falta' ? 'warn wide' : c.completo === 'Sí' ? 'ok wide' : 'wide');
+}
+const plPautaHtml = () => `<details class="pl-pauta"><summary>Ver tarjeta fitosanitaria (Cuadros 7 y 8)</summary><p>Se anota sólo la suma de las anomalías de cada componente: lo normal vale 0.</p>${PL_PAUTA.map(([t, rows]) => `<b>${esc(t)}</b><table>${rows.map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join('')}</table>`).join('')}<p><b>Clasificación:</b> Muy bueno 0–1 · Bueno >1–2 · Regular >2–3 · Malo >3–7 · Muy malo >7.</p></details>`;
+function renderPlanilla(el, n) {
+  const p = plInit(n), c = plCalc(p);
+  el.innerHTML = `<header class="head"><div class="title-row"><button class="icon-btn" data-act="pl-close" aria-label="Volver al registro">${I.back}</button><div style="flex:1;min-width:0"><h1>Formulario A-40</h1><span class="muted" style="font-size:13px">Planilla de terreno · individuo · * obligatorio</span></div></div></header>
+  <div class="flow pl">
+    ${c.noB ? '<div class="pl-note">Parche «No bosque»: sólo se registran ID, fecha, parche, especie y coordenadas. No se mide copa, diámetro ni estado sanitario.</div>' : ''}
+    ${PL_SEC.filter(([, , b]) => !(b && c.noB)).map(([t, ks]) => `<fieldset class="pl-sec"><legend>${t}</legend>${ks.map((k) => plFieldHtml(PL_F.find((f) => f.k === k), p, c)).join('')}${t === 'Estado fitosanitario' ? plPautaHtml() : ''}${t.startsWith('Coordenadas') && p.zone && p.zone !== 19 ? `<div class="pl-note">La ubicación está en la zona UTM ${p.zone}, no en la 19: revisa las coordenadas.</div>` : ''}</fieldset>`).join('')}
+    <div class="pl-alert" id="pl-alert" ${p.alerta && p.alerta !== 'No' ? '' : 'hidden'}>${I.shield}<span><b>Alerta</b>Infórmala hoy mismo a la coordinación de flora.</span></div>
+    <fieldset class="pl-sec"><legend>Cálculo automático</legend><div class="pl-calc" id="pl-calc" aria-live="polite">${plCalcHtml(c)}</div></fieldset>
+    <button class="btn" data-act="pl-close">${I.check}Listo</button>
+    <span class="muted pl-foot">El formulario queda en el registro al tocar «Guardar observación». Las columnas de gabinete (distancia a la obra, pendiente y zona radicular) no se llenan en terreno.</span>
+  </div>`;
+  const flow = el.querySelector('.pl');
+  flow.addEventListener('input', (e) => { if (e.target.tagName !== 'SELECT') plInput(n, e.target); });
+  flow.addEventListener('change', (e) => { if (e.target.tagName === 'SELECT' || e.target.dataset.pl === 'parche') plInput(n, e.target, true); });
+}
+// Redibuja el formulario sin perder la posición (cuando cambia qué campos se muestran).
+function plRedraw(n) {
+  const el = $('#s-nuevo'), top = el.querySelector('.pl')?.scrollTop || 0;
+  renderPlanilla(el, n);
+  el.querySelector('.pl').scrollTop = top;
+}
+// Al escribir se actualizan en el lugar las marcas de obligatorio, los rangos y los cálculos.
+function plRefresh(n) {
+  const p = n.pl, c = plCalc(p);
+  for (const f of PL_F) {
+    const box = document.querySelector(`[data-plf="${f.k}"]`);
+    if (!box) continue;
+    box.classList.toggle('miss', plReq(f, c) && plEmpty(p[f.k]));
+    box.classList.toggle('bad', c.bad.includes(f));
+    const inp = box.querySelector(`[data-pl="${f.k}"]`);
+    if (inp && inp !== document.activeElement && inp.value !== String(p[f.k] ?? '')) inp.value = p[f.k] ?? '';
+  }
+  $('#pl-calc').innerHTML = plCalcHtml(c);
+  $('#pl-alert').hidden = !(p.alerta && p.alerta !== 'No');
+}
+function plInput(n, t, commit) {
+  const k = t.dataset.pl, p = n.pl;
+  if (!k || !p) return;
+  const a = p.auto || (p.auto = {});
+  if (k === 'cond') {
+    if (!p.parche) { toast('Escribe primero el código del parche.'); t.value = ''; return; }
+    settings.plParches = { ...(settings.plParches || {}), [plKey(p.parche)]: t.value };
+    if (!t.value) delete settings.plParches[plKey(p.parche)];
+    saveSettings(); plRedraw(n); return;
+  }
+  if (k === 'parche') {
+    p.parche = commit ? t.value.trim().toUpperCase() : t.value;
+    if (commit) { t.value = p.parche; if (p.parche) { settings.plLastParche = p.parche; saveSettings(); } plRedraw(n); return; }
+  } else p[k] = t.value;
+  if (k === 'id') { a.id = false; p.id = t.value.toUpperCase(); }
+  if (k === 'foto') a.foto = false;
+  if (k === 'este' || k === 'norte') a.xy = false;
+  if (k === 'id' || k === 'especie') plAuto(n);
+  plRefresh(n);
 }
 /* ---------- ficha de un registro guardado ---------- */
 // Especie del registro en el formato que usan los alias.
@@ -1743,6 +1921,7 @@ function renderRecFicha(el, n, { head, main, later, ready, why }) {
     <div class="nv-row">${I.cal}<span class="info"><b>Fecha y hora</b><span>${esc(fmtWhen(n.when))}</span></span><button class="chip-btn" data-act="nv-edit-when">${n.editWhen ? 'Listo' : 'Editar'}</button></div>
     ${n.editWhen ? `<div class="nv-edit-box"><div class="field"><label for="nv-when">Fecha y hora de la observación</label><input id="nv-when" type="datetime-local" value="${esc(n.when)}"></div></div>` : ''}
     <div class="field"><div class="rf-notes-h"><label for="notas">Notas de campo</label><button class="chip-btn" data-act="rf-notes" aria-pressed="${!!n.notesEdit}">${n.notesEdit ? 'Listo' : 'Editar'}</button></div><textarea id="notas" rows="2" placeholder="${n.notesEdit ? 'Hábitat, número de individuos, fenología…' : 'Sin notas · toca «Editar» para escribir'}" ${n.notesEdit ? '' : 'readonly'} class="${n.notesEdit ? '' : 'locked'}">${esc(n.notes)}</textarea></div>
+    ${plLinkHtml(n)}
     <div class="rf-up">${o?.inatObs ? `<a class="btn outline done" href="https://www.inaturalist.org/observations/${encodeURIComponent(o.inatObs)}" target="_blank" rel="noopener">${I.check}En iNaturalist${I.ext}</a>` : `<button class="btn outline" data-act="rf-inat" ${up ? 'disabled' : ''}>${up ? '<i class="spin-s"></i>Subiendo…' : `Subir a iNaturalist${I.ext}`}</button>`}</div>
     ${o?.inatObs ? `<span class="muted rf-up-note">Subido a iNaturalist el ${esc(recDate({ when: o.inatAt }))} · observación n.º ${esc(o.inatObs)}</span>` : ''}
     <div class="nv-savebar">${why ? `<span>${why}</span>` : ''}<button class="btn nv-save" data-act="nv-save" ${ready ? '' : 'disabled'}>${I.check}Guardar observación</button></div></div>`;
@@ -2072,7 +2251,7 @@ function openRecEdit(uid) {
   const loc = o.lat != null ? { lat: o.lat, lng: o.lng } : {};
   const sel = o.taxonId ? { taxon: { id: o.taxonId, name: o.sci, preferred_common_name: o.common, default_photo: { square_url: o.photo } }, pct: o.conf ?? null, note: 'Especie actual' } : null;
   S.misSel?.clear();
-  S.nuevo = { edit: uid, orig: o, kind: o.kind, mapOpen: false, notesEdit: false, back: location.hash || '#herbario', photos: [{ preview: o.userPhoto || o.photo || '', orig: true, ...loc }], main: 0,
+  S.nuevo = { edit: uid, orig: o, kind: o.kind, mapOpen: false, notesEdit: false, pl: o.planilla ? { ...o.planilla, auto: {} } : null, back: location.hash || '#herbario', photos: [{ preview: o.userPhoto || o.photo || '', orig: true, ...loc }], main: 0,
     mode: o.taxonId ? 'cat' : 'later', sel, result: null, q: '', catalog: [], notes: o.notes || '', place: o.place || '', uid: o.uid,
     when: o.when || `${o.date || today()}T12:00`, lat: o.lat ?? null, lng: o.lng ?? null };
   S.nvTab = 'nuevo';
@@ -2088,6 +2267,7 @@ function nuevoSaveEdit(stay) {
   // Con la misma foto se conservan las ubicaciones de las demás fotos del registro.
   const same = n.photos.length === 1 && mp.orig;
   const upd = { ...o, userPhoto: mp.orig ? o.userPhoto : mp.preview, notes: n.notes, date: n.when.slice(0, 10), when: n.when, lat: n.lat, lng: n.lng, place: n.place || '' };
+  if (n.pl) upd.planilla = plSave(n);
   if (!same) Object.assign(upd, { photos: n.photos.length, photoLocs: n.photos.map((q) => (hasLoc(q) ? [q.lat, q.lng] : null)) });
   else if (o.photoLocs?.length) upd.photoLocs = o.photoLocs.map((q) => (q && o.lat != null && q[0] === o.lat && q[1] === o.lng ? [n.lat, n.lng] : q));
   if (later) {
@@ -2109,7 +2289,7 @@ function nuevoSaveEdit(stay) {
 function nuevoSave() {
   if (S.nuevo?.edit) { nuevoSaveEdit(); return; }
   const n = S.nuevo, later = n.mode === 'later' || !n.sel || !n.result;
-  const base = { uid: n.uid, userPhoto: n.photos[n.main].preview, photos: n.photos.length, photoLocs: n.photos.map((p) => (hasLoc(p) ? [p.lat, p.lng] : null)), notes: n.notes, date: n.when.slice(0, 10), when: n.when, lat: n.lat, lng: n.lng, place: n.place || '', kind: 'nuevo' };
+  const base = { uid: n.uid, userPhoto: n.photos[n.main].preview, photos: n.photos.length, photoLocs: n.photos.map((p) => (hasLoc(p) ? [p.lat, p.lng] : null)), notes: n.notes, date: n.when.slice(0, 10), when: n.when, lat: n.lat, lng: n.lng, place: n.place || '', kind: 'nuevo', planilla: plSave(n) };
   if (later) {
     addToCollection(Object.assign(base, { id: '', taxonId: null, sci: '', common: '', photo: '', status: 'sin_identificar' }));
     n.result = null;
@@ -2290,8 +2470,27 @@ function confirmRecDelete(uids) {
     <p style="margin:0;color:var(--ink2);line-height:1.5">Se borran de tu teléfono con sus fotos y notas. No se puede deshacer.</p>
     <div class="two"><button class="btn light" data-act="modal-close">Cancelar</button><button class="btn" data-act="mr-del-ok" style="background:#B3261E">${I.trash}Eliminar</button></div>`);
 }
+// Planilla A-40: hojas «Individuos» (columnas A a X) y «Parches» con los registros que tienen el formulario.
+function exportA40(list) {
+  const rows = list.filter((o) => o.planilla);
+  if (!rows.length) { toast('Ninguno de estos registros tiene el formulario A-40 completado.'); return; }
+  const fecha = (v) => (v ? v.split('-').reverse().join('-') : '');
+  const data = rows.map((o) => {
+    const p = o.planilla, c = plCalc(p), r = {};
+    for (const f of PL_F) { const v = p[f.k]; r[f.col] = f.t === 'num' && !plEmpty(v) && !isNaN(+v) ? +v : f.k === 'fecha' ? fecha(v) : v ?? ''; }
+    return Object.assign(r, { En_bosque: c.cond, Radio_copa_m: c.radio ?? '', Maduro: c.maduro, Estado_fito: c.fito, Completo: c.completo, Latitud: o.lat ?? '', Longitud: o.lng ?? '', Registro_app: recName(o) });
+  });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data, { header: [...PL_F.map((f) => f.col), 'En_bosque', 'Radio_copa_m', 'Maduro', 'Estado_fito', 'Completo', 'Latitud', 'Longitud', 'Registro_app'] }), 'Individuos');
+  const parches = [...new Set(rows.map((o) => plKey(o.planilla.parche)).filter(Boolean))];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(parches.map((k) => ({ Parche: k, Condicion_bosque: plParcheCond(k), N_individuos: rows.filter((o) => plKey(o.planilla.parche) === k).length })), { header: ['Parche', 'Condicion_bosque', 'N_individuos'] }), 'Parches');
+  XLSX.writeFile(wb, `A40_${today().replace(/-/g, '')}.xlsx`);
+  closeModal();
+  toast(`${rows.length} individuo${rows.length === 1 ? '' : 's'} exportado${rows.length === 1 ? '' : 's'} a la planilla A-40${rows.length < list.length ? ` (${list.length - rows.length} sin formulario)` : ''}`);
+}
 function exportRecords(fmt, list = S.collection.filter((o) => S.misSel?.has(o.uid)), name = `mis-registros-${today()}`, title = 'Mis registros') {
   if (!list.length) return;
+  if (fmt === 'a40') { exportA40(list); return; }
   let blob;
   if (fmt === 'kml') {
     const x = (v) => esc(v ?? '');
@@ -2465,7 +2664,7 @@ function openHerbExport() {
   S.hbExp = { list, name: `herbario-${(gen || fam || 'completo').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${today()}`, title: `Mi Herbario · ${where}` };
   openModal(`<div class="top"><h2>Exportar registros</h2><button class="x" data-act="modal-close" aria-label="Cerrar">${I.x}</button></div>
     <div class="hb-exp-sum"><span><b>Vista</b>${esc(where)}</span><span><b>Orden</b>${esc(sortL)}</span><span><b>Fechas</b>${herbRanged() ? esc(rangeText()) : 'Todas'}</span>${S.hbQ && gen ? `<span><b>Búsqueda</b>«${esc(S.hbQ)}»</span>` : ''}<span><b>Registros</b>${nf(list.length)}</span></div>
-    ${list.length ? `<div class="two"><button class="btn" data-hb-exp="csv">${I.dl}CSV (Excel)</button><button class="btn light" data-hb-exp="kml">${I.pin}KML (mapa)</button></div>` : '<p class="muted" style="margin:0">No hay registros con estos filtros.</p>'}`);
+    ${list.length ? `<div class="two"><button class="btn" data-hb-exp="csv">${I.dl}CSV (Excel)</button><button class="btn light" data-hb-exp="kml">${I.pin}KML (mapa)</button></div><button class="btn outline" data-hb-exp="a40">${I.book}Planilla A-40 (Excel)</button>` : '<p class="muted" style="margin:0">No hay registros con estos filtros.</p>'}`);
 }
 // Detalle de una especie del herbario: tus nuevos registros y tus capturas, en pestañas.
 function renderHerbSpecies(famName, genName, e) {
@@ -3321,13 +3520,15 @@ document.addEventListener('click', async (e) => {
     case 'nv-mode-later': S.nuevo.mode = 'later'; renderNuevo(); break;
     case 'nv-mode-cat': S.nuevo.mode = 'cat'; if (S.nuevo.sel && !S.nuevo.result) nuevoClassify(); else renderNuevo(); break;
     case 'nv-map-toggle': { const n = S.nuevo; if (n?.edit) { n.mapOpen = !n.mapOpen; renderNuevo(); break; } const on = !!n?.mapEdit || settings.nvMapHide === false; if (n) { n.mapEdit = false; n.mapBig = false; } settings.nvMapHide = on; saveSettings(); renderNuevo(); break; }
+    case 'pl-open': if (S.nuevo) { S.nuevo.plOpen = true; renderNuevo(); $('#s-nuevo .pl').scrollTop = 0; } break;
+    case 'pl-close': if (S.nuevo) { S.nuevo.plOpen = false; renderNuevo(); $('.pl-link')?.scrollIntoView({ block: 'center' }); } break;
     case 'nv-map-edit': if (S.nuevo) { S.nuevo.mapEdit = true; S.nuevo.mapBig = true; renderNuevo(); } break;
     case 'nv-map-big': { const n = S.nuevo; n.mapBig = !n.mapBig; t.textContent = n.mapBig ? 'Reducir' : n.edit ? 'Cambiar' : 'Editar'; nvMapEl?.classList.toggle('big', n.mapBig); setTimeout(() => { nvMap?.invalidateSize(); refreshNvMap(true); }, 220); break; }
     case 'nv-loc-me': currentLoc().then((ll) => { setNvPhotoLoc(ll.lat, ll.lng, 'gps'); refreshNvMap(true); }); break;
     case 'mr-ftoggle': settings.misFOpen = settings.misFOpen === false; saveSettings(); renderMisRegistros(); break;
     case 'mr-del': if (S.misSel?.size) confirmRecDelete([...S.misSel]); break;
     case 'mr-del-ok': { const del = new Set(S.mrDel || []); S.collection = S.collection.filter((c) => !del.has(c.uid)); saveCollection(); S.misSel?.clear(); closeModal(); renderPhotoPins(); refreshMis(); toast(`${del.size} registro${del.size === 1 ? '' : 's'} eliminado${del.size === 1 ? '' : 's'}`); break; }
-    case 'mr-exp': if (S.misSel?.size) openModal(`<div class="top"><h2>Exportar ${S.misSel.size} registro${S.misSel.size === 1 ? '' : 's'}</h2><button class="x" data-act="modal-close" aria-label="Cerrar">${I.x}</button></div><div class="two"><button class="btn" data-mr-exp="csv">${I.dl}CSV (Excel)</button><button class="btn light" data-mr-exp="kml">${I.pin}KML (mapa)</button></div>`); break;
+    case 'mr-exp': if (S.misSel?.size) openModal(`<div class="top"><h2>Exportar ${S.misSel.size} registro${S.misSel.size === 1 ? '' : 's'}</h2><button class="x" data-act="modal-close" aria-label="Cerrar">${I.x}</button></div><div class="two"><button class="btn" data-mr-exp="csv">${I.dl}CSV (Excel)</button><button class="btn light" data-mr-exp="kml">${I.pin}KML (mapa)</button></div><button class="btn outline" data-mr-exp="a40">${I.book}Planilla A-40 (Excel)</button>`); break;
     case 'nv-edit-when': S.nuevo.editWhen = !S.nuevo.editWhen; renderNuevo(); break;
     case 'nv-add-photo': openPhotoSource('add'); break;
     case 'nv-replace-photo': openPhotoSource('replace'); break;
