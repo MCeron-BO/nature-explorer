@@ -8,7 +8,7 @@ const RADII = [1, 5, 10, 25, 50];
 // v4: el radio se ajusta de 1 en 1 km con los botones − y + de la cabecera.
 const KM_MIN = 1, KM_MAX = 50;
 // Versión visible en la pantalla de inicio; se actualiza en cada publicación.
-const APP_VERSION = '1.0.26';
+const APP_VERSION = '1.0.27';
 const DEMO = { lat: -33.4246, lng: -70.6337, label: 'Cerro San Cristóbal, Santiago' };
 const MONTHS = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
@@ -1759,6 +1759,91 @@ const plKey = (c) => String(c || '').trim().toUpperCase();
 const plParcheCond = (c) => (settings.plParches || {})[plKey(c)] || (plKey(c) === 'FOOTPRINT' ? 'No bosque' : '');
 const plParches = () => [...new Set(['FOOTPRINT', ...Object.keys(settings.plParches || {}), ...S.collection.map((o) => plKey(o.planilla?.parche)).filter(Boolean)])];
 const plReq = (f, c) => f.req === 'all' || (f.req === 'b' && !c.noB);
+// Preguntas dinámicas: cada formulario guarda qué preguntas usa (`fields`, en orden) y la definición de las agregadas (`custom`).
+// La última selección queda como base para los próximos formularios y las preguntas nuevas, en un catálogo para reutilizarlas.
+const PL_TYPES = { text: 'Texto corto', area: 'Texto largo', num: 'Número', sel: 'Lista de opciones', yesno: 'Sí / No', date: 'Fecha' };
+const PL_EXTRA = 'Preguntas adicionales';
+const PL_SEC_OF = Object.fromEntries(PL_SEC.flatMap(([t, ks]) => ks.map((k) => [k, t])));
+const PL_BASE = PL_F.map((f) => f.k);
+const PL_LOCKED = ['id'];
+const plDef = (p, k) => PL_F.find((f) => f.k === k) || (p.custom || []).find((f) => f.k === k) || (settings.plCustom || []).find((f) => f.k === k);
+const plActive = (p) => (p.fields || PL_BASE).map((k) => plDef(p, k)).filter(Boolean);
+const plHas = (p, ...ks) => ks.every((k) => (p.fields || PL_BASE).includes(k));
+const plOpts = (f) => f.opts || (f.t === 'yesno' ? ['Sí', 'No'] : PL_LISTS[f.o] || []);
+const plOut = (f, v) => f.t === 'num' && !plEmpty(v) && (isNaN(+v) || (f.min != null && +v < f.min) || (f.max != null && +v > f.max));
+const plRangeTxt = (f) => (f.min != null && f.max != null ? `Debe estar entre ${nf(f.min)} y ${nf(f.max)}` : f.min != null ? `Mínimo ${nf(f.min)}` : f.max != null ? `Máximo ${nf(f.max)}` : 'Debe ser un número');
+// La selección de preguntas de este formulario queda como base para los próximos.
+function plRemember(p) { settings.plFields = [...(p.fields || PL_BASE)]; saveSettings(); }
+function plRemove(n, k) {
+  const p = n.pl, f = p && plDef(p, k);
+  if (!f || PL_LOCKED.includes(k)) return;
+  p.fields = (p.fields || PL_BASE).filter((x) => x !== k);
+  delete p[k];
+  plRemember(p); plRedraw(n);
+  toast(`Pregunta «${f.l}» quitada`);
+}
+function plAddField(n, k) {
+  const p = n.pl, f = p && plDef(p, k);
+  if (!f) return;
+  if (!PL_BASE.includes(k) && !(p.custom || []).some((c) => c.k === k)) p.custom = [...(p.custom || []), f];
+  p.fields = [...(p.fields || PL_BASE).filter((x) => x !== k), k];
+  plRemember(p); plRedraw(n);
+  toast(`Pregunta «${f.l}» agregada`);
+}
+function plNewQuestion(n) {
+  const p = n.pl, q = n.plQ || {};
+  const l = String(q.l || '').trim();
+  if (!l) { toast('Escribe la pregunta.'); $('#plq-l')?.focus(); return; }
+  if (plActive(p).some((f) => fold(f.l) === fold(l))) { toast('Ya hay una pregunta con ese nombre en el formulario.'); return; }
+  const f = { k: `c${Date.now().toString(36)}`, l, t: q.t || 'text', sec: q.sec || PL_EXTRA, req: q.req ? 'all' : '', h: String(q.h || '').trim() };
+  if (f.t === 'sel') {
+    f.opts = [...new Set(String(q.o || '').split('\n').map((x) => x.trim()).filter(Boolean))];
+    if (f.opts.length < 2) { toast('Escribe al menos dos opciones, una por línea.'); $('#plq-o')?.focus(); return; }
+  }
+  if (f.t === 'num') {
+    const mn = plEmpty(q.min) ? null : +q.min, mx = plEmpty(q.max) ? null : +q.max;
+    if (mn != null && mx != null && mn > mx) { toast('El mínimo no puede ser mayor que el máximo.'); return; }
+    Object.assign(f, { min: mn, max: mx, step: 'any' });
+  }
+  settings.plCustom = [...(settings.plCustom || []), f];
+  p.custom = [...(p.custom || []), f];
+  p.fields = [...(p.fields || PL_BASE), f.k];
+  n.plQ = null;
+  plRemember(p); plRedraw(n);
+  toast(`Pregunta «${l}» agregada`);
+}
+function plForget(n, k) {
+  settings.plCustom = (settings.plCustom || []).filter((f) => f.k !== k);
+  saveSettings(); plRedraw(n);
+}
+function plResetFields(n) {
+  n.pl.fields = [...PL_BASE];
+  plRemember(n.pl); plRedraw(n);
+  toast('Se restablecieron las preguntas originales de la planilla');
+}
+function plAddHtml(n) {
+  const p = n.pl, on = new Set(p.fields || PL_BASE);
+  const q = n.plQ || (n.plQ = { l: '', t: 'text', o: '', min: '', max: '', sec: PL_EXTRA, req: false, h: '' });
+  const avail = [...PL_F, ...(settings.plCustom || [])].filter((f) => !on.has(f.k));
+  return `<fieldset class="pl-sec pl-add"><legend>Agregar pregunta</legend>
+    ${avail.length ? `<div class="pl-add-k">Preguntas disponibles · toca para agregar</div><div class="pl-avail">${avail.map((f) => `<span class="pl-chip"><button data-pl-add="${f.k}">+ ${esc(f.l)}</button>${PL_BASE.includes(f.k) ? '' : `<button class="x" data-pl-forget="${f.k}" aria-label="Borrar «${esc(f.l)}» de las preguntas guardadas">${I.x}</button>`}</span>`).join('')}</div>` : ''}
+    <div class="pl-add-k">Nueva pregunta</div>
+    <div class="field pl-f"><label for="plq-l">Pregunta</label><input id="plq-l" data-plq="l" value="${esc(q.l)}" placeholder="Ej.: Presencia de regeneración" autocomplete="off"></div>
+    <div class="pl-two"><div class="field pl-f"><label for="plq-t">Tipo de respuesta</label><select id="plq-t" data-plq="t">${Object.entries(PL_TYPES).map(([k, v]) => `<option value="${k}" ${k === q.t ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+      <div class="field pl-f"><label for="plq-sec">Sección</label><select id="plq-sec" data-plq="sec">${[...PL_SEC.map((x) => x[0]), PL_EXTRA].map((x) => `<option ${x === q.sec ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div></div>
+    <div class="field pl-f" id="plq-opts" ${q.t === 'sel' ? '' : 'hidden'}><label for="plq-o">Opciones (una por línea)</label><textarea id="plq-o" data-plq="o" rows="3" placeholder="Alta&#10;Media&#10;Baja">${esc(q.o)}</textarea></div>
+    <div class="pl-two" id="plq-num" ${q.t === 'num' ? '' : 'hidden'}><div class="field pl-f"><label for="plq-min">Mínimo (opcional)</label><input id="plq-min" data-plq="min" type="number" inputmode="decimal" step="any" value="${esc(q.min)}"></div><div class="field pl-f"><label for="plq-max">Máximo (opcional)</label><input id="plq-max" data-plq="max" type="number" inputmode="decimal" step="any" value="${esc(q.max)}"></div></div>
+    <div class="field pl-f"><label for="plq-h">Ayuda (opcional)</label><input id="plq-h" data-plq="h" value="${esc(q.h)}" placeholder="Cómo se mide o qué anotar" autocomplete="off"></div>
+    <label class="pl-check"><input type="checkbox" data-plq="req" ${q.req ? 'checked' : ''}>Obligatoria</label>
+    <button class="btn" data-act="pl-q-add">+ Agregar pregunta</button>
+    <button class="btn ghost" data-act="pl-reset">Restablecer preguntas originales</button>
+  </fieldset>`;
+}
+function plQInput(n, t) {
+  const q = n.plQ || (n.plQ = {});
+  q[t.dataset.plq] = t.type === 'checkbox' ? t.checked : t.value;
+  if (t.dataset.plq === 't') { $('#plq-opts').hidden = q.t !== 'sel'; $('#plq-num').hidden = q.t !== 'num'; }
+}
 // Columnas grises de la planilla (T a X), con las mismas fórmulas.
 function plCalc(p) {
   const cond = !p.parche ? '' : plParcheCond(p.parche) || 'Parche no registrado';
@@ -1770,8 +1855,9 @@ function plCalc(p) {
   const sum = plNum(p.fFuste) + plNum(p.fHojas) + plNum(p.fFlores);
   const fito = !p.id ? '' : noB ? 'No aplica' : p.critica && p.critica !== 'Ninguna' ? 'Muy malo' : plEmpty(p.fFuste) || plEmpty(p.fHojas) ? 'Incompleto'
     : sum <= 1 ? 'Muy bueno' : sum <= 2 ? 'Bueno' : sum <= 3 ? 'Regular' : sum <= 7 ? 'Malo' : 'Muy malo';
-  const miss = PL_F.filter((f) => plReq(f, { noB }) && plEmpty(p[f.k]));
-  const bad = PL_F.filter((f) => f.t === 'num' && !plEmpty(p[f.k]) && (isNaN(+p[f.k]) || +p[f.k] < f.min || +p[f.k] > f.max));
+  const act = plActive(p);
+  const miss = act.filter((f) => plReq(f, { noB }) && plEmpty(p[f.k]));
+  const bad = act.filter((f) => plOut(f, p[f.k]));
   return { cond, noB, radio, maduro, fito, miss, bad, sum, completo: !p.id ? '' : miss.length ? 'Falta' : 'Sí' };
 }
 function plNextId(esp, uid) {
@@ -1787,7 +1873,7 @@ function plNextId(esp, uid) {
 // Mientras no se editen a mano: ID correlativo según la especie, foto = ID y coordenadas UTM desde la ubicación.
 function plAuto(n) {
   const p = n.pl, a = p.auto || {};
-  if (a.id) p.id = plNextId(p.especie, n.uid);
+  if (a.id && plHas(p, 'especie')) p.id = plNextId(p.especie, n.uid);
   if (a.foto) p.foto = p.id;
   if (a.xy && n.lat != null) { const u = toUTM(n.lat, n.lng); p.este = String(u.E); p.norte = String(u.N); p.zone = u.zone; }
 }
@@ -1797,6 +1883,10 @@ function plInit(n) {
   const esp = PL_LISTS.especie.includes(sp) ? sp : sp ? PL_LISTS.especie[2] : '';
   n.pl = { id: '', fecha: n.when.slice(0, 10), parche: settings.plLastParche || '', especie: esp, este: '', norte: '', altura: '', diam: '', tipoDiam: '', copaNS: '', copaEO: '', repro: '',
     fFuste: '', fHojas: '', fFlores: '', critica: 'Ninguna', foto: '', alerta: 'No', obs: '', auto: { id: true, foto: true, xy: true } };
+  // Preguntas: las del último formulario (si se quitaron o agregaron), si no las de la planilla.
+  const base = (settings.plFields || PL_BASE).filter((k) => plDef(n.pl, k));
+  n.pl.fields = base.includes('id') ? base : ['id', ...base];
+  n.pl.custom = n.pl.fields.filter((k) => !PL_BASE.includes(k)).map((k) => plDef(n.pl, k));
   plAuto(n);
   return n.pl;
 }
@@ -1807,38 +1897,43 @@ function plLinkHtml(n) {
   const sub = !c ? 'Planilla A-40 · datos del individuo' : c.completo === 'Sí' ? `${n.pl.id} · completo` : `${n.pl.id || 'Sin ID'} · falta${c.miss.length === 1 ? '' : 'n'} ${c.miss.length} campo${c.miss.length === 1 ? '' : 's'}`;
   return `<button class="pl-link ${c ? (c.completo === 'Sí' ? 'ok' : 'part') : ''}" data-act="pl-open">${I.book}<span><b>Completar Formulario</b><small>${esc(sub)}</small></span>${I.right}</button>`;
 }
-function plFieldHtml(f, p, c) {
+function plFieldHtml(f, p, c, edit) {
   const v = p[f.k] ?? '', req = plReq(f, c), id = `pl-${f.k}`;
   let input;
-  if (f.t === 'sel') input = `<select id="${id}" data-pl="${f.k}"><option value="">Elegir…</option>${PL_LISTS[f.o].map((o) => `<option ${o === v ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+  if (f.t === 'sel' || f.t === 'yesno') input = `<select id="${id}" data-pl="${f.k}"><option value="">Elegir…</option>${plOpts(f).map((o) => `<option ${o === v ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
   else if (f.t === 'area') input = `<textarea id="${id}" data-pl="${f.k}" rows="2">${esc(v)}</textarea>`;
   else if (f.t === 'parche') input = `<div class="pl-parche"><input id="${id}" data-pl="parche" list="pl-parches" value="${esc(v)}" autocomplete="off" autocapitalize="characters" placeholder="P-01"><select data-pl="cond" aria-label="Condición del parche"><option value="">Condición…</option>${PL_LISTS.cond.map((o) => `<option ${o === c.cond ? 'selected' : ''}>${o}</option>`).join('')}</select></div><datalist id="pl-parches">${plParches().map((x) => `<option value="${esc(x)}">`).join('')}</datalist>`;
-  else input = `<input id="${id}" data-pl="${f.k}" type="${f.t === 'num' ? 'number' : f.t}" ${f.t === 'num' ? `inputmode="decimal" min="${f.min}" max="${f.max}" step="${f.step}"` : ''} value="${esc(v)}">`;
-  return `<div class="field pl-f ${req && plEmpty(v) ? 'miss' : ''} ${c.bad.includes(f) ? 'bad' : ''}" data-plf="${f.k}"><label for="${id}">${esc(f.l)}${req ? '<i aria-label="obligatorio">*</i>' : ''}</label>${input}${f.t === 'num' ? `<em class="pl-err">Debe estar entre ${nf(f.min)} y ${nf(f.max)}</em>` : ''}${f.h ? `<small>${esc(f.h)}</small>` : ''}</div>`;
+  else input = `<input id="${id}" data-pl="${f.k}" type="${f.t === 'num' ? 'number' : f.t === 'date' ? 'date' : 'text'}" ${f.t === 'num' ? `inputmode="decimal" ${f.min != null ? `min="${f.min}"` : ''} ${f.max != null ? `max="${f.max}"` : ''} step="${f.step || 'any'}"` : ''} value="${esc(v)}" autocomplete="off">`;
+  const del = edit ? (PL_LOCKED.includes(f.k) ? `<span class="pl-lock" title="El ID no se puede quitar">${I.lock}</span>` : `<button class="pl-del" data-pl-del="${f.k}" aria-label="Quitar la pregunta «${esc(f.l)}»">${I.trash}</button>`) : '';
+  return `<div class="field pl-f ${req && plEmpty(v) ? 'miss' : ''} ${c.bad.some((b) => b.k === f.k) ? 'bad' : ''}" data-plf="${f.k}">${del}<label for="${id}">${esc(f.l)}${req ? '<i aria-label="obligatorio">*</i>' : ''}</label>${input}${f.t === 'num' ? `<em class="pl-err">${plRangeTxt(f)}</em>` : ''}${f.h ? `<small>${esc(f.h)}</small>` : ''}</div>`;
 }
-function plCalcHtml(c) {
+function plCalcHtml(c, p) {
   const row = (k, v, cls = '') => `<div class="pl-c ${cls}"><span>${k}</span><b>${esc(v || '—')}</b></div>`;
-  return row('En bosque', c.cond, c.cond === 'Parche no registrado' ? 'warn' : '')
-    + row('Radio de copa', c.radio != null ? `${c.radio.toFixed(2).replace('.', ',')} m` : '')
-    + row('Maduro', c.maduro, c.maduro === 'Revisar' ? 'warn' : '')
-    + row('Estado fitosanitario', c.fito, ['Incompleto', 'Malo', 'Muy malo'].includes(c.fito) ? 'warn' : '')
+  const has = (...ks) => plHas(p, ...ks);
+  return (has('parche') ? row('En bosque', c.cond, c.cond === 'Parche no registrado' ? 'warn' : '') : '')
+    + (has('copaNS', 'copaEO') ? row('Radio de copa', c.radio != null ? `${c.radio.toFixed(2).replace('.', ',')} m` : '') : '')
+    + (has('altura', 'diam', 'tipoDiam', 'repro') ? row('Maduro', c.maduro, c.maduro === 'Revisar' ? 'warn' : '') : '')
+    + (has('fFuste', 'fHojas') ? row('Estado fitosanitario', c.fito, ['Incompleto', 'Malo', 'Muy malo'].includes(c.fito) ? 'warn' : '') : '')
     + row('Completo', c.completo === 'Falta' ? `Falta${c.miss.length === 1 ? '' : 'n'} ${c.miss.length}` : c.completo, c.completo === 'Falta' ? 'warn wide' : c.completo === 'Sí' ? 'ok wide' : 'wide');
 }
 const plPautaHtml = () => `<details class="pl-pauta"><summary>Ver tarjeta fitosanitaria (Cuadros 7 y 8)</summary><p>Se anota sólo la suma de las anomalías de cada componente: lo normal vale 0.</p>${PL_PAUTA.map(([t, rows]) => `<b>${esc(t)}</b><table>${rows.map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join('')}</table>`).join('')}<p><b>Clasificación:</b> Muy bueno 0–1 · Bueno >1–2 · Regular >2–3 · Malo >3–7 · Muy malo >7.</p></details>`;
 function renderPlanilla(el, n) {
-  const p = plInit(n), c = plCalc(p);
-  el.innerHTML = `<header class="head"><div class="title-row"><button class="icon-btn" data-act="pl-close" aria-label="Volver al registro">${I.back}</button><div style="flex:1;min-width:0"><h1>Formulario A-40</h1><span class="muted" style="font-size:13px">Planilla de terreno · individuo · * obligatorio</span></div></div></header>
-  <div class="flow pl">
+  const p = plInit(n), c = plCalc(p), edit = !!n.plEdit, act = plActive(p);
+  const secs = [...PL_SEC, [PL_EXTRA, [], false]].map(([t, , b]) => [t, act.filter((f) => (f.sec || PL_SEC_OF[f.k] || PL_EXTRA) === t), b]).filter(([, fs, b]) => fs.length && !(b && c.noB));
+  el.innerHTML = `<header class="head"><div class="title-row"><button class="icon-btn" data-act="pl-close" aria-label="Volver al registro">${I.back}</button><div style="flex:1;min-width:0"><h1>Formulario A-40</h1><span class="muted" style="font-size:13px">${edit ? 'Editando las preguntas' : 'Planilla de terreno · * obligatorio'}</span></div><button class="chip-btn pl-edit-btn ${edit ? 'on' : ''}" data-act="pl-edit" aria-pressed="${edit}">${edit ? `${I.check}Listo` : `${I.edit}Preguntas`}</button></div></header>
+  <div class="flow pl ${edit ? 'editing' : ''}">
+    ${edit ? '<div class="pl-note pl-edit-note">Toca la papelera para quitar una pregunta y agrega otras al final. Los cambios se usan en este formulario y quedan como base para los próximos.</div>' : ''}
     ${c.noB ? '<div class="pl-note">Parche «No bosque»: sólo se registran ID, fecha, parche, especie y coordenadas. No se mide copa, diámetro ni estado sanitario.</div>' : ''}
-    ${PL_SEC.filter(([, , b]) => !(b && c.noB)).map(([t, ks]) => `<fieldset class="pl-sec"><legend>${t}</legend>${ks.map((k) => plFieldHtml(PL_F.find((f) => f.k === k), p, c)).join('')}${t === 'Estado fitosanitario' ? plPautaHtml() : ''}${t.startsWith('Coordenadas') && p.zone && p.zone !== 19 ? `<div class="pl-note">La ubicación está en la zona UTM ${p.zone}, no en la 19: revisa las coordenadas.</div>` : ''}</fieldset>`).join('')}
+    ${secs.map(([t, fs]) => `<fieldset class="pl-sec"><legend>${esc(t)}</legend>${fs.map((f) => plFieldHtml(f, p, c, edit)).join('')}${t === 'Estado fitosanitario' && plHas(p, 'fFuste') ? plPautaHtml() : ''}${t.startsWith('Coordenadas') && p.zone && p.zone !== 19 ? `<div class="pl-note">La ubicación está en la zona UTM ${p.zone}, no en la 19: revisa las coordenadas.</div>` : ''}</fieldset>`).join('')}
     <div class="pl-alert" id="pl-alert" ${p.alerta && p.alerta !== 'No' ? '' : 'hidden'}>${I.shield}<span><b>Alerta</b>Infórmala hoy mismo a la coordinación de flora.</span></div>
-    <fieldset class="pl-sec"><legend>Cálculo automático</legend><div class="pl-calc" id="pl-calc" aria-live="polite">${plCalcHtml(c)}</div></fieldset>
+    ${edit ? plAddHtml(n) : ''}
+    <fieldset class="pl-sec"><legend>Cálculo automático</legend><div class="pl-calc" id="pl-calc" aria-live="polite">${plCalcHtml(c, p)}</div></fieldset>
     <button class="btn" data-act="pl-close">${I.check}Listo</button>
     <span class="muted pl-foot">El formulario queda en el registro al tocar «Guardar observación». Las columnas de gabinete (distancia a la obra, pendiente y zona radicular) no se llenan en terreno.</span>
   </div>`;
   const flow = el.querySelector('.pl');
-  flow.addEventListener('input', (e) => { if (e.target.tagName !== 'SELECT') plInput(n, e.target); });
-  flow.addEventListener('change', (e) => { if (e.target.tagName === 'SELECT' || e.target.dataset.pl === 'parche') plInput(n, e.target, true); });
+  flow.addEventListener('input', (e) => { if (e.target.dataset.plq) plQInput(n, e.target); else if (e.target.tagName !== 'SELECT') plInput(n, e.target); });
+  flow.addEventListener('change', (e) => { if (e.target.dataset.plq) plQInput(n, e.target); else if (e.target.tagName === 'SELECT' || e.target.dataset.pl === 'parche') plInput(n, e.target, true); });
 }
 // Redibuja el formulario sin perder la posición (cuando cambia qué campos se muestran).
 function plRedraw(n) {
@@ -1849,15 +1944,15 @@ function plRedraw(n) {
 // Al escribir se actualizan en el lugar las marcas de obligatorio, los rangos y los cálculos.
 function plRefresh(n) {
   const p = n.pl, c = plCalc(p);
-  for (const f of PL_F) {
+  for (const f of plActive(p)) {
     const box = document.querySelector(`[data-plf="${f.k}"]`);
     if (!box) continue;
     box.classList.toggle('miss', plReq(f, c) && plEmpty(p[f.k]));
-    box.classList.toggle('bad', c.bad.includes(f));
+    box.classList.toggle('bad', c.bad.some((b) => b.k === f.k));
     const inp = box.querySelector(`[data-pl="${f.k}"]`);
     if (inp && inp !== document.activeElement && inp.value !== String(p[f.k] ?? '')) inp.value = p[f.k] ?? '';
   }
-  $('#pl-calc').innerHTML = plCalcHtml(c);
+  $('#pl-calc').innerHTML = plCalcHtml(c, p);
   $('#pl-alert').hidden = !(p.alerta && p.alerta !== 'No');
 }
 function plInput(n, t, commit) {
@@ -2475,13 +2570,25 @@ function exportA40(list) {
   const rows = list.filter((o) => o.planilla);
   if (!rows.length) { toast('Ninguno de estos registros tiene el formulario A-40 completado.'); return; }
   const fecha = (v) => (v ? v.split('-').reverse().join('-') : '');
+  // Preguntas agregadas: una columna por pregunta (con su texto como encabezado).
+  const extra = new Map(), used = new Set([...PL_F.map((f) => f.col), 'En_bosque', 'Radio_copa_m', 'Maduro', 'Estado_fito', 'Completo', 'Latitud', 'Longitud', 'Registro_app']);
+  for (const o of rows) for (const f of plActive(o.planilla)) {
+    if (PL_BASE.includes(f.k) || extra.has(f.k)) continue;
+    let col = f.l, i = 2;
+    while (used.has(col)) col = `${f.l} (${i++})`;
+    used.add(col); extra.set(f.k, { ...f, col });
+  }
+  const val = (f, v) => (f.t === 'num' && !plEmpty(v) && !isNaN(+v) ? +v : f.t === 'date' ? fecha(v) : v ?? '');
   const data = rows.map((o) => {
-    const p = o.planilla, c = plCalc(p), r = {};
-    for (const f of PL_F) { const v = p[f.k]; r[f.col] = f.t === 'num' && !plEmpty(v) && !isNaN(+v) ? +v : f.k === 'fecha' ? fecha(v) : v ?? ''; }
-    return Object.assign(r, { En_bosque: c.cond, Radio_copa_m: c.radio ?? '', Maduro: c.maduro, Estado_fito: c.fito, Completo: c.completo, Latitud: o.lat ?? '', Longitud: o.lng ?? '', Registro_app: recName(o) });
+    const p = o.planilla, c = plCalc(p), r = {}, on = new Set(p.fields || PL_BASE);
+    for (const f of PL_F) r[f.col] = on.has(f.k) ? val(f, p[f.k]) : '';
+    for (const [k, f] of extra) r[f.col] = on.has(k) ? val(f, p[k]) : '';
+    // Los cálculos quedan vacíos si al formulario se le quitó alguna de sus preguntas.
+    const h = (...ks) => plHas(p, ...ks);
+    return Object.assign(r, { En_bosque: h('parche') ? c.cond : '', Radio_copa_m: h('copaNS', 'copaEO') ? c.radio ?? '' : '', Maduro: h('altura', 'diam', 'tipoDiam', 'repro') ? c.maduro : '', Estado_fito: h('fFuste', 'fHojas') ? c.fito : '', Completo: c.completo, Latitud: o.lat ?? '', Longitud: o.lng ?? '', Registro_app: recName(o) });
   });
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data, { header: [...PL_F.map((f) => f.col), 'En_bosque', 'Radio_copa_m', 'Maduro', 'Estado_fito', 'Completo', 'Latitud', 'Longitud', 'Registro_app'] }), 'Individuos');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data, { header: [...PL_F.map((f) => f.col), ...[...extra.values()].map((f) => f.col), 'En_bosque', 'Radio_copa_m', 'Maduro', 'Estado_fito', 'Completo', 'Latitud', 'Longitud', 'Registro_app'] }), 'Individuos');
   const parches = [...new Set(rows.map((o) => plKey(o.planilla.parche)).filter(Boolean))];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(parches.map((k) => ({ Parche: k, Condicion_bosque: plParcheCond(k), N_individuos: rows.filter((o) => plKey(o.planilla.parche) === k).length })), { header: ['Parche', 'Condicion_bosque', 'N_individuos'] }), 'Parches');
   XLSX.writeFile(wb, `A40_${today().replace(/-/g, '')}.xlsx`);
@@ -3426,6 +3533,9 @@ document.addEventListener('click', async (e) => {
     refreshMis(); toast(`Identificada como ${cap(t.preferred_common_name) || t.name}`); return;
   }
   if (d.mrExp) { exportRecords(d.mrExp); return; }
+  if (d.plDel) { if (S.nuevo?.pl) plRemove(S.nuevo, d.plDel); return; }
+  if (d.plAdd) { if (S.nuevo?.pl) plAddField(S.nuevo, d.plAdd); return; }
+  if (d.plForget) { if (S.nuevo?.pl) plForget(S.nuevo, d.plForget); return; }
   if (d.nvDel != null) { nuevoDelPhoto(Number(d.nvDel)); return; }
   if (d.nvRecent != null) { const n = S.nuevo, t = n.recent[Number(d.nvRecent)]; n.sel = { taxon: t, pct: null, note: 'Registrada hace poco' }; sfx('pop'); nuevoClassify(); return; }
   if (d.nvMain) { const n = S.nuevo; n.main = Number(d.nvMain); if (syncNuevoLoc(n) && n.sel) nuevoClassify(); else renderNuevo(); return; }
@@ -3520,8 +3630,11 @@ document.addEventListener('click', async (e) => {
     case 'nv-mode-later': S.nuevo.mode = 'later'; renderNuevo(); break;
     case 'nv-mode-cat': S.nuevo.mode = 'cat'; if (S.nuevo.sel && !S.nuevo.result) nuevoClassify(); else renderNuevo(); break;
     case 'nv-map-toggle': { const n = S.nuevo; if (n?.edit) { n.mapOpen = !n.mapOpen; renderNuevo(); break; } const on = !!n?.mapEdit || settings.nvMapHide === false; if (n) { n.mapEdit = false; n.mapBig = false; } settings.nvMapHide = on; saveSettings(); renderNuevo(); break; }
+    case 'pl-edit': if (S.nuevo?.pl) { S.nuevo.plEdit = !S.nuevo.plEdit; plRedraw(S.nuevo); } break;
+    case 'pl-q-add': if (S.nuevo?.pl) plNewQuestion(S.nuevo); break;
+    case 'pl-reset': if (S.nuevo?.pl) plResetFields(S.nuevo); break;
     case 'pl-open': if (S.nuevo) { S.nuevo.plOpen = true; renderNuevo(); $('#s-nuevo .pl').scrollTop = 0; } break;
-    case 'pl-close': if (S.nuevo) { S.nuevo.plOpen = false; renderNuevo(); $('.pl-link')?.scrollIntoView({ block: 'center' }); } break;
+    case 'pl-close': if (S.nuevo) { S.nuevo.plOpen = false; S.nuevo.plEdit = false; renderNuevo(); $('.pl-link')?.scrollIntoView({ block: 'center' }); } break;
     case 'nv-map-edit': if (S.nuevo) { S.nuevo.mapEdit = true; S.nuevo.mapBig = true; renderNuevo(); } break;
     case 'nv-map-big': { const n = S.nuevo; n.mapBig = !n.mapBig; t.textContent = n.mapBig ? 'Reducir' : n.edit ? 'Cambiar' : 'Editar'; nvMapEl?.classList.toggle('big', n.mapBig); setTimeout(() => { nvMap?.invalidateSize(); refreshNvMap(true); }, 220); break; }
     case 'nv-loc-me': currentLoc().then((ll) => { setNvPhotoLoc(ll.lat, ll.lng, 'gps'); refreshNvMap(true); }); break;
